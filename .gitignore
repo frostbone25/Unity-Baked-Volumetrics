@@ -2,13 +2,22 @@
 #
 # Get latest from https://github.com/github/gitignore/blob/master/Unity.gitignore
 #
-/[Ll]ibrary/
-/[Tt]emp/
-/[Oo]bj/
-/[Bb]uild/
-/[Bb]uilds/
-/[Ll]ogs/
-/[Mm]emoryCaptures/
+BakedVolumetrics/[Ll]ibrary/
+BakedVolumetrics/[Tt]emp/
+BakedVolumetrics/[Oo]bj/
+BakedVolumetrics/[Bb]uild/
+BakedVolumetrics/[Bb]uilds/
+BakedVolumetrics/BuildTest/
+BakedVolumetrics/Exported/
+BakedVolumetrics/[Ll]ogs/
+BakedVolumetrics/[Mm]emoryCaptures/
+BakedVolumetrics/Assets/CubemapFog/
+BakedVolumetrics/Assets/CustomBloom/
+BakedVolumetrics/Assets/Editor/
+BakedVolumetrics/Assets/ProductionSky/
+BakedVolumetrics/Assets/RPG_FPS_game_assets_industrial/
+BakedVolumetrics/Assets/SkyPrecomputed/
+BakedVolumetrics/Assets/Editor/
 
 # Asset meta data should only be ignored when the corresponding asset is also ignored
 !/[Aa]ssets/**/*.meta
