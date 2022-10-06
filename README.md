@@ -4,12 +4,12 @@ A **work in progress** graphics solution for completely baked volumetric lightin
 # Results
 ![sponza1](GithubContent/sponza1.jpg)
 
-![sponza2](GithubContent/sponza2.jpg)
+![sponza2](GithubContent/sponza2.png)
 
-![sponza3](GithubContent/sponza3.jpg)
+![sponza3](GithubContent/sponza3.png)
 
 ![yakohama1](GithubContent/yakohama1.png)
 
-![yakohama2](GithubContent/yakohama2.jpg)
+![yakohama2](GithubContent/yakohama2.png)
 
 ![yakohama3](GithubContent/yakohama3.jpg)
