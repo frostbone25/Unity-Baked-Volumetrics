@@ -26,6 +26,8 @@ The scene based solution is for circumstances where you don't have access to or 
 
 The post processing based version is a work in progress currently, and is meant to be the proper implementation of this effect. It also allows me to leverage more techniques to make the effect way more efficent and lightweight at runtime.
 
+This has been tested and works on Oculus/Meta Quest 2.
+
 # TODO
 1. Finish post processing version of this effect, adding interleaved rendering and temporal filtering to save on performance.
 2. For post processing version of this effect, using a froxel to intersect many different volumes.
