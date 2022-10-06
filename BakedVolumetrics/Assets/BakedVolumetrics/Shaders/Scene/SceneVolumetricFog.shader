@@ -35,7 +35,7 @@
             #pragma multi_compile SAMPLES_8 SAMPLES_16 SAMPLES_24 SAMPLES_32 SAMPLES_48 SAMPLES_64 SAMPLES_128
             #include "UnityCG.cginc"
 
-            /*
+
 #ifdef SAMPLES_8
 #define _RaymarchSteps 8
 #elif SAMPLES_16
@@ -51,16 +51,17 @@
 #elif SAMPLES_128
 #define _RaymarchSteps 128
 #else
-//#define _RaymarchSteps 32
+#define _RaymarchSteps 32
 #endif
-*/
-#define _RaymarchSteps 16384 //RTX 3080 STRESS TEST
+
+//#define _RaymarchSteps 16384 //RTX 3080 STRESS TEST
 
             struct appdata
             {
                 fixed4 vertex : POSITION;
 
-                UNITY_VERTEX_INPUT_INSTANCE_ID //Insert
+                //Single Pass Instanced Support
+                UNITY_VERTEX_INPUT_INSTANCE_ID 
             };
 
             struct v2f
@@ -70,7 +71,8 @@
                 fixed3 camRelativeWorldPos : TEXCOORD1;
                 float2 depth : TEXCOORD2;
 
-                UNITY_VERTEX_OUTPUT_STEREO //Insert
+                //Single Pass Instanced Support
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             sampler3D_half _VolumeTexture;
@@ -97,9 +99,10 @@
             {
                 v2f o;
 
-                UNITY_SETUP_INSTANCE_ID(v); //Insert
-                UNITY_INITIALIZE_OUTPUT(v2f, o); //Insert
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o); //Insert
+                //Single Pass Instanced Support
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_OUTPUT(v2f, o);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
                 o.vertex = UnityObjectToClipPos(v.vertex);
 
@@ -107,17 +110,14 @@
 
                 o.camRelativeWorldPos = mul(unity_ObjectToWorld, fixed4(v.vertex.xyz, 1.0)).xyz - _WorldSpaceCameraPos;
 
-                COMPUTE_EYEDEPTH(o.depth);
-
                 return o;
             }
 
 
             fixed4 frag(v2f i) : SV_Target
             {
-                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i); //Insert
-
-            float2 depthTest = i.depth;
+                //Single Pass Instanced Support
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
                 //get our screen uv coords
                 fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
@@ -169,9 +169,6 @@
                     //scale the current ray position to be within the volume
                     fixed3 scaledPos = ((raymarch_currentPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
 
-                    //sample the fog color
-                    fixed3 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0)).rgb;
-
                     //get the distances of the ray and the world position
                     fixed distanceRay = distance(scaledCameraPos, scaledPos);
                     fixed distanceWorld = distance(scaledCameraPos, scaledWorldPos);
@@ -185,6 +182,9 @@
                         if (distanceRay < distanceWorld && result.a < 1.0f)
                         {
                             //sample the fog color
+                            fixed3 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0)).rgb;
+
+                            //accumulate the samples
                             //result += fixed4(sampledColor, (_VolumeDensity)) * stepLength; //this is slightly cheaper
                             result += fixed4(sampledColor, exp(_VolumeDensity)) * stepLength; //uses exponential falloff, looks a little nicer but may not be needed
                         }
@@ -198,8 +198,6 @@
 
                 //clamp the alpha channel otherwise we get blending issues with bright spots
                 result.a = clamp(result.a, 0.0f, 1.0f);
-
-                return float4(depthTest, 0, 1);
 
                 //return the final fog color
                 return result;
