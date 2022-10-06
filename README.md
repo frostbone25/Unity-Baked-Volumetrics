@@ -1,5 +1,7 @@
 # Unity Baked Volumetrics
-A **work in progress** graphics solution for completely baked volumetric lighting, meant to be very lightweight and inexpensive for VR. More details will be revealed but it's very much a work in progress...
+A **work in progress** graphics solution for completely baked volumetric lighting, meant to be very lightweight and inexpensive for VR. 
+
+***More details will be revealed but it's very much a work in progress...***
 
 # Results
 ![sponza1](GithubContent/sponza1.jpg)
