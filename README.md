@@ -1,5 +1,5 @@
 # Unity Baked Volumetrics
-A **work in progress** graphics solution for completely baked volumetric lighting, meant to be very lightweight and inexpensive. More details will be revealed but it's very much a work in progress...
+A **work in progress** graphics solution for completely baked volumetric lighting, meant to be very lightweight and inexpensive for VR. More details will be revealed but it's very much a work in progress...
 
 # Results
 ![sponza1](GithubContent/sponza1.jpg)
@@ -26,7 +26,7 @@ The scene based solution is for circumstances where you don't have access to or 
 
 The post processing based version is a work in progress currently, and is meant to be the proper implementation of this effect. It also allows me to leverage more techniques to make the effect way more efficent and lightweight at runtime.
 
-This has been tested and works on Oculus/Meta Quest 2.
+Will be elaborated on but yes this has been tested and works on Oculus/Meta Quest 2.
 
 # TODO
 1. Finish post processing version of this effect, adding interleaved rendering and temporal filtering to save on performance.
