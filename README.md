@@ -38,3 +38,4 @@ The post processing based version is a work in progress currently, and is meant 
 3. POST PROCESSING - Using a froxel to intersect multiple volumes in a scene, and raymarch only once (rather than raymarch for each volume in the scene which would be dumb).
 4. OFFLINE VOLUME GENERATION - Improve the raytraced volume speed by multithreading.
 5. OFFLINE VOLUME GENERATION - Create a custom pathtraced/raytraced solution that voxelizes the scene within the volume and traces against it rather than relying on scene light probes which can be low quality (Could also be potentially faster than the current CPU only implemntation of the raytracer?).
+6. EDITOR - Previewing Voxels is really really slow at low density values.
