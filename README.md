@@ -1,7 +1,7 @@
 # Unity Baked Volumetrics
 A **work in progress** graphics solution for completely baked volumetric lighting, meant to be very lightweight and inexpensive. More details will be revealed but it's very much a work in progress...
 
-NOTE: Built-In Rendering Pipeline.
+**NOTE: Constructed on the Built-In Rendering Pipeline.**
 
 The general concept is the following, you define a volume within your scene. You set the voxel density for ths volume, and choose to either sample colors from the scene light probes, or a custom raytracer. This generates a 3D texture that is saved into the disk, and in the shader all we do at runtime is raymarch through this 3d texture against the scene depth buffer to get the desired effect.
 
