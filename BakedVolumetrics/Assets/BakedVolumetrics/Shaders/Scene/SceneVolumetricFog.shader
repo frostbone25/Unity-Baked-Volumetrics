@@ -120,7 +120,7 @@
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
                 //get our screen uv coords
-                fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
+                fixed2 screenUV = UNITY_PROJ_COORD(i.screenPos);
 
 
 #if UNITY_UV_STARTS_AT_TOP
@@ -136,7 +136,7 @@
 #endif
 
                 //draw our scene depth texture and linearize it
-                fixed linearDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, screenUV));
+                fixed linearDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.screenPos)));
 
                 //calculate the world position view plane for the camera
                 fixed3 cameraWorldPositionViewPlane = i.camRelativeWorldPos.xyz / dot(i.camRelativeWorldPos.xyz, unity_WorldToCamera._m20_m21_m22);
