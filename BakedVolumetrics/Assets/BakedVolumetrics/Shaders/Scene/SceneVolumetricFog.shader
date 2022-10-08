@@ -120,7 +120,7 @@
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
                 //get our screen uv coords
-                fixed2 screenUV = UNITY_PROJ_COORD(i.screenPos);
+                fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
 
 
 #if UNITY_UV_STARTS_AT_TOP
