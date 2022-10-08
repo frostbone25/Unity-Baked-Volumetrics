@@ -14,6 +14,7 @@ namespace BakedVolumetrics
 {
     public class RenderVoxel : MonoBehaviour
     {
+        /*
         public Texture3D sceneVoxel_albedo;
         public Texture3D sceneVoxel_emissive;
         public Texture3D sceneVoxel_normal;
@@ -402,6 +403,7 @@ namespace BakedVolumetrics
                 }
             }
         }
+        */
     }
 }
 
