@@ -11,8 +11,8 @@ BakedVolumetrics/BuildTest/
 BakedVolumetrics/Exported/
 BakedVolumetrics/[Ll]ogs/
 BakedVolumetrics/[Mm]emoryCaptures/
-BakedVolumetrics/Assets/CubemapFog/
 BakedVolumetrics/Assets/CubemapFog.meta
+BakedVolumetrics/Assets/CubemapFog/
 BakedVolumetrics/Assets/CustomBloom/
 BakedVolumetrics/Assets/CustomBloom.meta
 BakedVolumetrics/Assets/Editor/
