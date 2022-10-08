@@ -10,11 +10,17 @@ A **work in progress** graphics solution for completely baked volumetric lightin
 
 ![sponza3](GithubContent/sponza3.png)
 
+![industrial1](GithubContent/industrial1.png)
+
 ![yakohama1](GithubContent/yakohama1.png)
 
 ![yakohama2](GithubContent/yakohama2.png)
 
 ![yakohama3](GithubContent/yakohama3.jpg)
+
+![church1](GithubContent/church1.png)
+
+![church2](GithubContent/church2.png)
 
 # Context
 
