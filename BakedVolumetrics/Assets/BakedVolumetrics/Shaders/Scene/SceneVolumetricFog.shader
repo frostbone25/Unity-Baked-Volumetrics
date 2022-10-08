@@ -181,12 +181,12 @@
                         //And also keep going if we haven't reached the fullest density just yet.
                         if (distanceRay < distanceWorld && result.a < 1.0f)
                         {
-                            //sample the fog color
-                            fixed3 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0)).rgb;
+                            //sample the fog color (rgb = color, a = density)
+                            fixed4 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0));
 
                             //accumulate the samples
-                            //result += fixed4(sampledColor, (_VolumeDensity)) * stepLength; //this is slightly cheaper
-                            result += fixed4(sampledColor, exp(_VolumeDensity)) * stepLength; //uses exponential falloff, looks a little nicer but may not be needed
+                            result += fixed4(sampledColor.rgb, sampledColor.a * _VolumeDensity) * stepLength; //this is slightly cheaper
+                            //result += fixed4(sampledColor.rgb, sampledColor.a * exp(_VolumeDensity)) * stepLength; //uses exponential falloff, looks a little nicer but may not be needed
                         }
                         else
                             break; //terminante the ray 

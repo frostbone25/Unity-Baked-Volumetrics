@@ -12,9 +12,9 @@ using UnityEngine.UIElements;
 
 namespace BakedVolumetrics
 {
-    [CustomEditor(typeof(SampleRaytrace))]
+    [CustomEditor(typeof(SampleCPURaytrace))]
     [CanEditMultipleObjects]
-    public class SampleRaytraceEditor : Editor
+    public class SampleCPURaytraceEditor : Editor
     {
         SerializedProperty raytracedAttenuationType;
         SerializedProperty ambientIntensity;
@@ -80,7 +80,7 @@ namespace BakedVolumetrics
             if (showUI.boolValue == false)
                 return;
 
-            SampleRaytrace sampleRaytrace = serializedObject.targetObject as SampleRaytrace;
+            SampleCPURaytrace sampleRaytrace = serializedObject.targetObject as SampleCPURaytrace;
 
             EditorGUILayout.LabelField("Raytraced Volume Lighting", EditorStyles.whiteLargeLabel);
 

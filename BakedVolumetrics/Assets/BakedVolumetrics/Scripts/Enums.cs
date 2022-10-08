@@ -33,9 +33,9 @@ namespace BakedVolumetrics
     }
     public enum LightingSource
     {
-        Lightprobes,
-        Raytraced,
-        Combined,
+        LightProbes,
+        VoxelRaytrace,
+        CPU_Raytrace
     }
 
     public enum RenderingStyle
@@ -48,6 +48,13 @@ namespace BakedVolumetrics
     {
         Linear,
         InverseSquare
+    }
+
+    public enum DensityType
+    {
+        Constant,
+        Luminance,
+        HeightBased
     }
 }
 #endif

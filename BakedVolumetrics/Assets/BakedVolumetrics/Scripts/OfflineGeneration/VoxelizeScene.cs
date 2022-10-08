@@ -12,6 +12,14 @@ using UnityEngine.Rendering;
 
 namespace BakedVolumetrics
 {
+    /*
+     * SELF NOTE 1: The Anti-Aliasing when used for the generation of the voxels does help maintain geometry at low resolutions, however there is a quirk because it also samples the background color.
+     * This was noticable when rendering position/normals voxel buffers where when on some geo looked darker than usual because the BG color was black.
+     * Not to sure how to solve this and just might deal with it?
+     *
+     * SELF NOTE 2: Generating normals/position buffers might not actually be needed? More so the normals? We might be able to compute those by hand in the compute shader.
+    */
+
     public class VoxelizeScene : MonoBehaviour
     {
         [Header("Voxelizer Main")]
@@ -51,7 +59,7 @@ namespace BakedVolumetrics
         private void GetResources()
         {
             if (slicer == null) slicer = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/Slicer.compute");
-            if (voxelize == null) voxelize = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/Voxelize.compute");
+            if (voxelize == null) voxelize = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/VoxelTracing.compute");
 
             if (cameraVoxelAlbedoShader == null) cameraVoxelAlbedoShader = Shader.Find("Hidden/CameraVoxelAlbedo");
             if (cameraVoxelEmissiveShader == null) cameraVoxelEmissiveShader = Shader.Find("Hidden/CameraVoxelEmissive");

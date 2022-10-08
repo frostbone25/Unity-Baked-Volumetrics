@@ -12,7 +12,7 @@ using UnityEngine.Rendering;
 
 namespace BakedVolumetrics
 {
-    public class SampleRaytrace : MonoBehaviour
+    public class SampleCPURaytrace : MonoBehaviour
     {
         //public
         //global settings

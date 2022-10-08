@@ -28,6 +28,13 @@ namespace BakedVolumetrics
         SerializedProperty additiveRaytracedIntensity;
         SerializedProperty lerpFactor;
         SerializedProperty raymarchSamples;
+        SerializedProperty previewDensityHeight;
+        SerializedProperty densityType;
+        SerializedProperty densityHeight;
+        SerializedProperty densityHeightFallof;
+        SerializedProperty densityConstant;
+        SerializedProperty densityTop;
+        SerializedProperty densityBottom;
 
         VolumeGenerator scriptObject;
 
@@ -48,6 +55,13 @@ namespace BakedVolumetrics
             additiveLightprobeIntensity = serializedObject.FindProperty("additiveLightprobeIntensity");
             additiveRaytracedIntensity = serializedObject.FindProperty("additiveRaytracedIntensity");
             lerpFactor = serializedObject.FindProperty("lerpFactor");
+            previewDensityHeight = serializedObject.FindProperty("previewDensityHeight");
+            densityType = serializedObject.FindProperty("densityType");
+            densityHeight = serializedObject.FindProperty("densityHeight");
+            densityHeightFallof = serializedObject.FindProperty("densityHeightFallof");
+            densityConstant = serializedObject.FindProperty("densityConstant");
+            densityTop = serializedObject.FindProperty("densityTop");
+            densityBottom = serializedObject.FindProperty("densityBottom");
         }
 
         public override void OnInspectorGUI()
@@ -59,8 +73,10 @@ namespace BakedVolumetrics
             scriptObject.UpdateMaterialKeywords();
 
             LightingSource lightingSourceValue = (LightingSource)lightingSource.intValue;
-            scriptObject.sampleRaytrace.showUI = lightingSourceValue == LightingSource.Raytraced || lightingSourceValue == LightingSource.Combined;
-            scriptObject.sampleLightprobe.showUI = lightingSourceValue == LightingSource.Lightprobes || lightingSourceValue == LightingSource.Combined;
+            scriptObject.sampleCPURaytrace.showUI = lightingSourceValue == LightingSource.CPU_Raytrace;
+            scriptObject.sampleLightprobe.showUI = lightingSourceValue == LightingSource.LightProbes;
+            //scriptObject.sampleRaytrace.showUI = lightingSourceValue == LightingSource.CPU_Raytracer || lightingSourceValue == LightingSource.Combined;
+            //scriptObject.sampleLightprobe.showUI = lightingSourceValue == LightingSource.Lightprobes || lightingSourceValue == LightingSource.Combined;
 
             EditorGUILayout.LabelField("Volume Properties", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(volumeName);
@@ -87,6 +103,7 @@ namespace BakedVolumetrics
             EditorGUILayout.PropertyField(lightingSource);
             EditorGUILayout.PropertyField(renderingStyle);
 
+            /*
             if(lightingSourceValue == LightingSource.Combined)
             {
                 EditorGUILayout.PropertyField(combineColorType);
@@ -104,11 +121,34 @@ namespace BakedVolumetrics
                     lerpFactor.floatValue = EditorGUILayout.Slider("Lerp Factor", lerpFactor.floatValue, 0.0f, 1.0f);
                 }
             }
+            */
+
+            EditorGUILayout.LabelField("Volume Density", EditorStyles.whiteLargeLabel);
+            EditorGUILayout.PropertyField(densityType);
+
+            DensityType densityTypeValue = (DensityType)densityType.intValue;
+
+            if (densityTypeValue == DensityType.Constant)
+            {
+                EditorGUILayout.PropertyField(densityConstant);
+            }
+            else if (densityTypeValue == DensityType.HeightBased)
+            {
+                EditorGUILayout.PropertyField(densityTop);
+                EditorGUILayout.PropertyField(densityBottom);
+
+                EditorGUILayout.PropertyField(densityHeight);
+                EditorGUILayout.PropertyField(densityHeightFallof);
+            }
 
             EditorGUILayout.Space(10);
 
             EditorGUILayout.LabelField("Gizmos", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(previewBounds);
+
+            if((DensityType)densityType.intValue == DensityType.HeightBased) 
+                EditorGUILayout.PropertyField(previewDensityHeight);
+
             EditorGUILayout.PropertyField(previewVoxels);
             EditorGUILayout.Space(10);
 

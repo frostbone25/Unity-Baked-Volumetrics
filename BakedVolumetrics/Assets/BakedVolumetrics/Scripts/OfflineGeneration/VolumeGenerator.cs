@@ -17,7 +17,7 @@ namespace BakedVolumetrics
         //public
         public string volumeName = "Volume";
 
-        public LightingSource lightingSource = LightingSource.Lightprobes;
+        public LightingSource lightingSource = LightingSource.LightProbes;
         public RenderingStyle renderingStyle = RenderingStyle.SceneObject;
         public CombineColorType combineColorType = CombineColorType.Additive;
         public float additiveLightprobeIntensity = 1.0f;
@@ -33,13 +33,23 @@ namespace BakedVolumetrics
         public Vector3 volumeSize = new Vector3(10.0f, 10.0f, 10.0f);
 
         public bool previewBounds = true;
+        public bool previewDensityHeight = true;
         public bool previewVoxels = false;
 
         public int jitterResolution = 64;
 
+        public DensityType densityType = DensityType.Constant;
+        public float densityConstant = 1.0f;
+        public float densityTop = 0.0f;
+        public float densityBottom = 1.0f;
+        public float densityHeight = 0.0f;
+        public float densityHeightFallof = 1.0f;
+
         public SampleLightprobe sampleLightprobe;
-        public SampleRaytrace sampleRaytrace;
+        public SampleCPURaytrace sampleCPURaytrace;
         public VolumePostFilters volumePostFilters;
+
+        private GameObject sceneColliders;
 
         //private
         private GameObject fogSceneObject;
@@ -68,12 +78,12 @@ namespace BakedVolumetrics
 
         public void Setup()
         {
-            sampleRaytrace = gameObject.GetComponent<SampleRaytrace>();
+            sampleCPURaytrace = gameObject.GetComponent<SampleCPURaytrace>();
             sampleLightprobe = gameObject.GetComponent<SampleLightprobe>();
             volumePostFilters = gameObject.GetComponent<VolumePostFilters>();
 
-            if (sampleRaytrace == null)
-                sampleRaytrace = gameObject.AddComponent<SampleRaytrace>();
+            if (sampleCPURaytrace == null)
+                sampleCPURaytrace = gameObject.AddComponent<SampleCPURaytrace>();
 
             if (sampleLightprobe == null)
                 sampleLightprobe = gameObject.AddComponent<SampleLightprobe>();
@@ -159,12 +169,16 @@ namespace BakedVolumetrics
             Vector3 probePosition = new Vector3(transform.position.x + (x * x_offset), transform.position.y + (y * y_offset), transform.position.z + (z * z_offset));
             Vector3 voxelWorldSize = new Vector3(x_offset, y_offset, z_offset);
 
+            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
+            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
+            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
             Color colorResult = Color.black;
 
-            if (lightingSource == LightingSource.Raytraced)
-                colorResult = sampleRaytrace.SampleVolumetricColor(probePosition, voxelWorldSize);
-            else if (lightingSource == LightingSource.Lightprobes)
+            if (lightingSource == LightingSource.CPU_Raytrace)
+                colorResult = sampleCPURaytrace.SampleVolumetricColor(probePosition, voxelWorldSize);
+            else if (lightingSource == LightingSource.LightProbes)
                 colorResult = sampleLightprobe.SampleVolumetricColor(probePosition, voxelWorldSize);
+            /*
             if (lightingSource == LightingSource.Combined)
             {
                 Color raytraceColor = sampleRaytrace.SampleVolumetricColor(probePosition, voxelWorldSize);
@@ -175,9 +189,41 @@ namespace BakedVolumetrics
                 else if (combineColorType == CombineColorType.Additive)
                     colorResult = (raytraceColor * additiveRaytracedIntensity) + (lightprobeColor * additiveLightprobeIntensity);
             }
+            */
 
+            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+            float alphaResult = 1.0f;
+
+            if (densityType == DensityType.Constant)
+            {
+                alphaResult = densityConstant;
+            }
+            else if(densityType == DensityType.Luminance)
+            {
+                Vector3 luminance = new Vector3(0, 0, 0);
+                Vector3 colorAsVector = new Vector3(colorResult.r, colorResult.g, colorResult.b);
+
+                if (PlayerSettings.colorSpace == ColorSpace.Gamma)
+                    luminance = new Vector3(0.22f, 0.707f, 0.071f);
+                else if(PlayerSettings.colorSpace == ColorSpace.Linear)
+                    luminance = new Vector3(0.0396819152f, 0.45802179f, 0.00609653955f);
+
+                alphaResult = Vector3.Dot(colorAsVector, luminance);
+            }
+            else if(densityType == DensityType.HeightBased)
+            {
+                float lerpFactor = Mathf.Clamp((probePosition.y - densityHeight) / densityHeightFallof, 0.0f, 1.0f);
+                alphaResult = Mathf.Lerp(densityBottom, densityTop, lerpFactor);
+            }
+
+            colorResult = new Color(colorResult.r, colorResult.g, colorResult.b, alphaResult);
+
+            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
+            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
+            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
             Vector3Int volumeTexturePosition = new Vector3Int(x + (volumeResolution.x / 2), y + (volumeResolution.y / 2), z + (volumeResolution.z / 2));
-
             volumeTexture.SetPixel(volumeTexturePosition.x, volumeTexturePosition.y, volumeTexturePosition.z, colorResult);
         }
 
@@ -452,13 +498,28 @@ namespace BakedVolumetrics
         {
             CalculateResolution();
 
-            Gizmos.color = Color.white;
+            Gizmos.color = Color.yellow;
 
             if(!previewVoxels && previewBounds)
+            {
+                Gizmos.color = Color.yellow;
                 Gizmos.DrawWireCube(transform.position, volumeSize);
+            }
+
+            if(previewDensityHeight && densityType == DensityType.HeightBased)
+            {
+                Gizmos.color = Color.cyan;
+
+                Vector3 heightPosition = new Vector3(transform.position.x, densityHeight + (densityHeightFallof * 0.5f), transform.position.z);
+                Vector3 heightFallof = new Vector3(volumeSize.x, densityHeightFallof, volumeSize.z);
+
+                Gizmos.DrawWireCube(heightPosition, heightFallof);
+            }
 
             if(previewVoxels)
             {
+                Gizmos.color = Color.white;
+
                 //3d loop for our volume
                 for (int x = -volumeResolution.x / 2; x <= volumeResolution.x / 2; x++)
                 {
