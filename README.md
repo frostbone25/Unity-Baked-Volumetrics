@@ -26,6 +26,8 @@ A **work in progress** graphics solution for completely baked volumetric lightin
 
 **NOTE: Constructed on the Built-In Rendering Pipeline.**
 
+**TLDR (too long didn't read)**: Think of this like lightmapping volumetric lighting and fog. 
+
 The general concept is the following...
 
 You define a box volume within your scene. You set the voxel density for ths volume *(or you can set a custom resolution)*, and choose to either sample colors from the scene light probes, or a custom raytracer, or both. Each have their advantages and drawbacks, but from there you use that to generate a 3D texture that is saved into the disk. At runtime, we sample this 3D texture and raymarch through it against the scene depth buffer to get the desired effect.
