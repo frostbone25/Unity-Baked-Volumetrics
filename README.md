@@ -59,10 +59,10 @@ Currently right now it imitates the Scene Based solution, and it has a minor opt
 *Will be elaborated on but yes this has been tested and works on Oculus/Meta Quest 2.*
 
 # TODO
-**POST PROCESSING:** Adding interleaved rendering to save on performance.
-**POST PROCESSING:** Adding temporal filtering and animated noise to accumulate samples and save on performance.
-**POST PROCESSING:** Using a froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
-**OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading.
-**OFFLINE VOLUME GENERATION:** Create a custom pathtraced/raytraced solution that voxelizes the scene within the volume and traces against it rather than relying on scene light probes which can be low quality (Could also be potentially faster than the current CPU only implemntation of the raytracer?).
-**EDITOR:** Previewing Voxels is really really slow at low density values, need to come up with a different way to preview the different voxels.
-**EDITOR:** Add a context menu item in the scene hiearchy to create a volume.
+- **POST PROCESSING:** Adding interleaved rendering to save on performance.
+- **POST PROCESSING:** Adding temporal filtering and animated noise to accumulate samples and save on performance.
+- **POST PROCESSING:** Using a froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
+- **OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading.
+- **OFFLINE VOLUME GENERATION:** Create a custom pathtraced/raytraced solution that voxelizes the scene within the volume and traces against it rather than relying on scene light probes which can be low quality (Could also be potentially faster than the current CPU only implemntation of the raytracer?).
+- **EDITOR:** Previewing Voxels is really really slow at low density values, need to come up with a different way to preview the different voxels.
+- **EDITOR:** Add a context menu item in the scene hiearchy to create a volume.
