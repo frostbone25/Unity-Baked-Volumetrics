@@ -23,7 +23,7 @@ A **work in progress** graphics solution for completely baked volumetric lightin
 ![church2](GithubContent/church2.png)
 
 # Features
-**NOTE: Constructed on the Built-In Rendering Pipeline.**
+
 Overview: This is basically lightmapping but for volumetric lighting and fog. 
 
 - Completely baked volumetric lighting designed to be lightweight, and is baked completely offline in-editor.
@@ -31,6 +31,8 @@ Overview: This is basically lightmapping but for volumetric lighting and fog.
 - Different density types for the fog. Constant, Luminance Based, or Height Based.
 - Adjustments can be applied to tweak the look of the generated volume, along with a 3D Gaussian blur can be applied to improve the quality of the bake.
 - There is a non post process scene based version, and a post process version.
+
+**NOTE: Constructed on the Built-In Rendering Pipeline.**
 
 # More Context
 
