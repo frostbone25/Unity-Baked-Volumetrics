@@ -46,10 +46,9 @@ namespace BakedVolumetrics
         public float densityHeightFallof = 1.0f;
 
         public SampleLightprobe sampleLightprobe;
+        public SampleVoxelRaytrace sampleVoxelRaytrace;
         public SampleCPURaytrace sampleCPURaytrace;
         public VolumePostFilters volumePostFilters;
-
-        private GameObject sceneColliders;
 
         //private
         private GameObject fogSceneObject;
@@ -58,35 +57,80 @@ namespace BakedVolumetrics
         private Vector3Int volumeResolution;
         private Texture3D volumeTexture;
 
+        private static string sceneStaticCollidersName = "TEMP_SceneStaticColliders";
+        private GameObject sceneStaticColliders;
+
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| GETTERS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| GETTERS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| GETTERS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
-        public int GetTotalVoxelCount()
+        public int GetTotalVoxelCount() => volumeResolution.x * volumeResolution.y * volumeResolution.z;
+
+        public Vector3Int GetVoxelResolution() => volumeResolution;
+
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+        /// <summary>
+        /// Spawns mesh colliders for all objects in the scene marked with the 'ContributeGI' static flag.
+        /// <para>This is used in general for features (if they are enabled) like preventing light leaks, doing occlusion, or getting indoor only samples.</para>
+        /// </summary>
+        public void SetupSceneColliders()
         {
-            return volumeResolution.x * volumeResolution.y * volumeResolution.z;
+            sceneStaticColliders = new GameObject(sceneStaticCollidersName);
+
+            MeshFilter[] meshes = FindObjectsOfType<MeshFilter>();
+
+            for (int i = 0; i < meshes.Length; i++)
+            {
+                GameObject meshGameObject = meshes[i].gameObject;
+
+                StaticEditorFlags staticEditorFlags = GameObjectUtility.GetStaticEditorFlags(meshGameObject);
+
+                if (staticEditorFlags.HasFlag(StaticEditorFlags.ContributeGI))
+                {
+                    GameObject sceneColliderChild = new GameObject("collider");
+                    sceneColliderChild.transform.SetParent(sceneStaticColliders.transform);
+
+                    sceneColliderChild.transform.position = meshGameObject.transform.position;
+                    sceneColliderChild.transform.rotation = meshGameObject.transform.rotation;
+                    sceneColliderChild.transform.localScale = meshGameObject.transform.localScale;
+
+                    MeshCollider meshCollider = sceneColliderChild.AddComponent<MeshCollider>();
+                    meshCollider.sharedMesh = meshes[i].sharedMesh;
+                }
+            }
         }
 
-        public Vector3Int GetVoxelResolution()
+        public void RemoveSceneColliders()
         {
-            return volumeResolution;
-        }
+            if (sceneStaticColliders != null)
+                DestroyImmediate(sceneStaticColliders);
+            else
+            {
+                sceneStaticColliders = GameObject.Find(sceneStaticCollidersName);
 
-        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+                if (sceneStaticColliders != null)
+                    DestroyImmediate(sceneStaticColliders);
+            }
+        }
 
         public void Setup()
         {
             sampleCPURaytrace = gameObject.GetComponent<SampleCPURaytrace>();
             sampleLightprobe = gameObject.GetComponent<SampleLightprobe>();
             volumePostFilters = gameObject.GetComponent<VolumePostFilters>();
-
-            if (sampleCPURaytrace == null)
-                sampleCPURaytrace = gameObject.AddComponent<SampleCPURaytrace>();
+            sampleVoxelRaytrace = gameObject.GetComponent<SampleVoxelRaytrace>();
 
             if (sampleLightprobe == null)
                 sampleLightprobe = gameObject.AddComponent<SampleLightprobe>();
+
+            if (sampleVoxelRaytrace == null)
+                sampleVoxelRaytrace = gameObject.AddComponent<SampleVoxelRaytrace>();
+
+            if (sampleCPURaytrace == null)
+                sampleCPURaytrace = gameObject.AddComponent<SampleCPURaytrace>();
 
             if (volumePostFilters == null)
                 volumePostFilters = gameObject.AddComponent<VolumePostFilters>();
@@ -164,6 +208,16 @@ namespace BakedVolumetrics
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
+        private static Vector3 GetLuminance()
+        {
+            if (PlayerSettings.colorSpace == ColorSpace.Gamma)
+                return new Vector3(0.22f, 0.707f, 0.071f);
+            else if (PlayerSettings.colorSpace == ColorSpace.Linear)
+                return new Vector3(0.0396819152f, 0.45802179f, 0.00609653955f);
+            else
+                return Vector3.one;
+        }
+
         private void SampleVolumetricColor(int x, int y, int z, float x_offset, float y_offset, float z_offset)
         {
             Vector3 probePosition = new Vector3(transform.position.x + (x * x_offset), transform.position.y + (y * y_offset), transform.position.z + (z * z_offset));
@@ -202,13 +256,8 @@ namespace BakedVolumetrics
             }
             else if(densityType == DensityType.Luminance)
             {
-                Vector3 luminance = new Vector3(0, 0, 0);
+                Vector3 luminance = GetLuminance();
                 Vector3 colorAsVector = new Vector3(colorResult.r, colorResult.g, colorResult.b);
-
-                if (PlayerSettings.colorSpace == ColorSpace.Gamma)
-                    luminance = new Vector3(0.22f, 0.707f, 0.071f);
-                else if(PlayerSettings.colorSpace == ColorSpace.Linear)
-                    luminance = new Vector3(0.0396819152f, 0.45802179f, 0.00609653955f);
 
                 alphaResult = Vector3.Dot(colorAsVector, luminance);
             }
@@ -216,6 +265,15 @@ namespace BakedVolumetrics
             {
                 float lerpFactor = Mathf.Clamp((probePosition.y - densityHeight) / densityHeightFallof, 0.0f, 1.0f);
                 alphaResult = Mathf.Lerp(densityBottom, densityTop, lerpFactor);
+            }
+            else if (densityType == DensityType.HeightBasedLuminance)
+            {
+                Vector3 luminance = GetLuminance();
+                Vector3 colorAsVector = new Vector3(colorResult.r, colorResult.g, colorResult.b);
+
+                float lumaResult = Vector3.Dot(colorAsVector, luminance);
+                float lerpFactor = Mathf.Clamp((probePosition.y - densityHeight) / densityHeightFallof, 0.0f, 1.0f);
+                alphaResult = Mathf.Lerp(lumaResult * densityBottom, lumaResult * densityTop, lerpFactor);
             }
 
             colorResult = new Color(colorResult.r, colorResult.g, colorResult.b, alphaResult);
@@ -241,6 +299,7 @@ namespace BakedVolumetrics
             volumeTexture.name = name;
 
             Setup();
+            SetupSceneColliders();
             CalculateResolution();
 
             UpdateProgressBar("Sampling colors into 3d texture...", 0.5f);
@@ -265,7 +324,7 @@ namespace BakedVolumetrics
             volumeTexture.Apply();
 
             SaveVolumeTexture(volumeTexture);
-
+            RemoveSceneColliders();
             UpdateMaterial();
         }
 
@@ -281,7 +340,7 @@ namespace BakedVolumetrics
             string volumeAssetName = volumeName + ".asset";
             string volumeAssetPath = sceneVolumetricsFolder + "/" + volumeAssetName;
 
-            //AssetDatabase.DeleteAsset(volumeAssetPath);
+            AssetDatabase.DeleteAsset(volumeAssetPath);
             AssetDatabase.CreateAsset(tex3D, volumeAssetPath);
 
             UpdateProgressBar("Applying post effects to 3d texture...", 0.9f);
@@ -498,15 +557,15 @@ namespace BakedVolumetrics
         {
             CalculateResolution();
 
-            Gizmos.color = Color.yellow;
-
+            //bounds
             if(!previewVoxels && previewBounds)
             {
                 Gizmos.color = Color.yellow;
                 Gizmos.DrawWireCube(transform.position, volumeSize);
             }
 
-            if(previewDensityHeight && densityType == DensityType.HeightBased)
+            //height preview
+            if(previewDensityHeight && (densityType == DensityType.HeightBased || densityType == DensityType.HeightBasedLuminance))
             {
                 Gizmos.color = Color.cyan;
 
@@ -516,6 +575,7 @@ namespace BakedVolumetrics
                 Gizmos.DrawWireCube(heightPosition, heightFallof);
             }
 
+            //voxel preview (note to self: this is really damn slow)
             if(previewVoxels)
             {
                 Gizmos.color = Color.white;

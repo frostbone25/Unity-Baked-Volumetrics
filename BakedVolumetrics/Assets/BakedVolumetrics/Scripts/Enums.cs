@@ -54,7 +54,8 @@ namespace BakedVolumetrics
     {
         Constant,
         Luminance,
-        HeightBased
+        HeightBased,
+        HeightBasedLuminance
     }
 }
 #endif

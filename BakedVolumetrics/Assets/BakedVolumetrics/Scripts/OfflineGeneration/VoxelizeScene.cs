@@ -45,6 +45,14 @@ namespace BakedVolumetrics
         private GameObject voxelCameraGameObject;
         private Camera voxelCamera;
 
+        private Light[] sceneLights 
+        { 
+            get 
+            { 
+                return FindObjectsOfType<Light>();  
+            } 
+        }
+
         private Vector3Int voxelResolution;
         private ComputeShader slicer;
         private ComputeShader voxelize;
@@ -52,6 +60,11 @@ namespace BakedVolumetrics
         private Shader cameraVoxelEmissiveShader;
         private Shader cameraVoxelNormalShader;
         private Shader cameraVoxelPositionShader;
+
+        private Texture3D voxelAlbedoBuffer;
+        private Texture3D voxelEmissiveBuffer;
+        private Texture3D voxelNormalBuffer;
+        private Texture3D voxelPositionBuffer;
 
         private static TextureFormat textureformat = TextureFormat.RGBAHalf;
         private static RenderTextureFormat rendertextureformat = RenderTextureFormat.ARGBHalf;
@@ -65,6 +78,22 @@ namespace BakedVolumetrics
             if (cameraVoxelEmissiveShader == null) cameraVoxelEmissiveShader = Shader.Find("Hidden/CameraVoxelEmissive");
             if (cameraVoxelNormalShader == null) cameraVoxelNormalShader = Shader.Find("Hidden/CameraVoxelNormal");
             if (cameraVoxelPositionShader == null) cameraVoxelPositionShader = Shader.Find("Hidden/CameraVoxelPosition");
+        }
+
+        private void GetVoxelBuffers()
+        {
+            UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.GetActiveScene();
+            string sceneName = activeScene.name;
+            string sceneVolumetricsFolder = "Assets/BakedVolumetrics/Data/" + sceneName;
+            string voxelAssetPath_albedo = sceneVolumetricsFolder + "/" + string.Format("{0}_albedo.asset", voxelName);
+            string voxelAssetPath_emissive = sceneVolumetricsFolder + "/" + string.Format("{0}_emissive.asset", voxelName);
+            string voxelAssetPath_normal = sceneVolumetricsFolder + "/" + string.Format("{0}_normal.asset", voxelName);
+            string voxelAssetPath_position = sceneVolumetricsFolder + "/" + string.Format("{0}_position.asset", voxelName);
+
+            voxelAlbedoBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_albedo);
+            voxelEmissiveBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_emissive);
+            voxelNormalBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_normal);
+            voxelPositionBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_position);
         }
 
         private void SetupVoxelCamera()
@@ -141,13 +170,201 @@ namespace BakedVolumetrics
             return output;
         }
 
-        [ContextMenu("Generate")]
+        [ContextMenu("Trace Scene")]
+        public void TraceScene()
+        {
+            GetResources();
+            GetVoxelBuffers();
+
+            //|||||||||||||||||||||||||||||||||||||||||| GET SCENE LIGHTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| GET SCENE LIGHTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| GET SCENE LIGHTS ||||||||||||||||||||||||||||||||||||||||||
+            List<VoxelLightDirectional> voxelLightDirectionals = new List<VoxelLightDirectional>();
+            List<VoxelLightPoint> voxelLightPoints = new List<VoxelLightPoint>();
+            List<VoxelLightSpot> voxelLightSpots = new List<VoxelLightSpot>();
+            List<VoxelLightArea> voxelLightAreas = new List<VoxelLightArea>();
+
+            foreach(Light sceneLight in sceneLights)
+            {
+                if(sceneLight.type == LightType.Directional)
+                {
+                    VoxelLightDirectional voxelLightDirectional = new VoxelLightDirectional()
+                    {
+                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
+                        lightDirection = sceneLight.transform.forward,
+                        lightIntensity = sceneLight.intensity,
+                    };
+
+                    voxelLightDirectionals.Add(voxelLightDirectional);
+                }
+                else if(sceneLight.type == LightType.Point)
+                {
+                    VoxelLightPoint voxelLightPoint = new VoxelLightPoint()
+                    {
+                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
+                        lightIntensity = sceneLight.intensity,
+                        lightPosition = sceneLight.transform.position,
+                        lightRange = sceneLight.range,
+                    };
+
+                    voxelLightPoints.Add(voxelLightPoint);
+                }
+                else if(sceneLight.type == LightType.Spot)
+                {
+                    VoxelLightSpot voxelLightSpot = new VoxelLightSpot()
+                    {
+                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
+                        lightIntensity = sceneLight.intensity,
+                        lightPosition = sceneLight.transform.position,
+                        lightDirection = sceneLight.transform.forward,
+                        lightRange = sceneLight.range,
+                        lightAngle = sceneLight.spotAngle,
+                    };
+
+                    voxelLightSpots.Add(voxelLightSpot);
+                }
+                else if(sceneLight.type == LightType.Area)
+                {
+                    VoxelLightArea voxelLightArea = new VoxelLightArea()
+                    {
+                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
+                        lightIntensity = sceneLight.intensity,
+                        lightDirection = sceneLight.transform.forward,
+                        lightPosition = sceneLight.transform.position,
+                        lightRange = sceneLight.range,
+                        lightSize = sceneLight.areaSize,
+                    };
+
+                    voxelLightAreas.Add(voxelLightArea);
+                }
+            }
+
+            //|||||||||||||||||||||||||||||||||||||||||| BUILD SCENE LIGHT BUFFERS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| BUILD SCENE LIGHT BUFFERS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| BUILD SCENE LIGHT BUFFERS ||||||||||||||||||||||||||||||||||||||||||
+
+            ComputeBuffer directionalLightsBuffer = null;
+            ComputeBuffer pointLightsBuffer = null;
+            ComputeBuffer spotLightsBuffer = null;
+            ComputeBuffer areaLightsBuffer = null;
+
+            //build directional light buffer
+            if (voxelLightDirectionals.Count > 0)
+            {
+                directionalLightsBuffer = new ComputeBuffer(voxelLightDirectionals.Count, VoxelLightDirectional.GetByteSize() * voxelLightDirectionals.Count);
+                directionalLightsBuffer.SetData(voxelLightDirectionals.ToArray());
+            }
+
+            //build point light buffer
+            if (voxelLightPoints.Count > 0)
+            {
+                pointLightsBuffer = new ComputeBuffer(voxelLightPoints.Count, VoxelLightPoint.GetByteSize() * voxelLightPoints.Count);
+                pointLightsBuffer.SetData(voxelLightPoints.ToArray());
+            }
+
+            //build spot light buffer
+            if (voxelLightSpots.Count > 0)
+            {
+                spotLightsBuffer = new ComputeBuffer(voxelLightSpots.Count, VoxelLightSpot.GetByteSize() * voxelLightSpots.Count);
+                spotLightsBuffer.SetData(voxelLightSpots.ToArray());
+            }
+
+            //build area light buffer
+            if (voxelLightAreas.Count > 0)
+            {
+                areaLightsBuffer = new ComputeBuffer(voxelLightAreas.Count, VoxelLightArea.GetByteSize() * voxelLightAreas.Count);
+                areaLightsBuffer.SetData(voxelLightAreas.ToArray());
+            }
+
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER ||||||||||||||||||||||||||||||||||||||||||
+
+            int compute_main = voxelize.FindKernel("CSMain");
+
+            voxelize.SetVector("VolumeResolution", new Vector4(voxelResolution.x, voxelResolution.y, voxelResolution.z, 0));
+
+            if(directionalLightsBuffer != null) voxelize.SetBuffer(compute_main, "DirectionalLights", directionalLightsBuffer);
+            if (pointLightsBuffer != null) voxelize.SetBuffer(compute_main, "PointLights", pointLightsBuffer);
+            if (spotLightsBuffer != null) voxelize.SetBuffer(compute_main, "SpotLights", spotLightsBuffer);
+            if (areaLightsBuffer != null) voxelize.SetBuffer(compute_main, "AreaLights", areaLightsBuffer);
+
+            RenderTexture volumeWrite = new RenderTexture(voxelResolution.x, voxelResolution.y, 0, rendertextureformat);
+            volumeWrite.dimension = TextureDimension.Tex3D;
+            volumeWrite.volumeDepth = voxelResolution.z;
+            volumeWrite.enableRandomWrite = true;
+            volumeWrite.Create();
+
+            voxelize.SetTexture(compute_main, "SceneAlbedo", voxelAlbedoBuffer);
+            voxelize.SetTexture(compute_main, "SceneEmissive", voxelEmissiveBuffer);
+            voxelize.SetTexture(compute_main, "SceneNormal", voxelNormalBuffer);
+            voxelize.SetTexture(compute_main, "ScenePosition", voxelPositionBuffer);
+            voxelize.SetTexture(compute_main, "Write", volumeWrite);
+
+            voxelize.Dispatch(compute_main, voxelResolution.x, voxelResolution.y, voxelResolution.z);
+
+            //|||||||||||||||||||||||||||||||||||||||||| RESULT ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| RESULT ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| RESULT ||||||||||||||||||||||||||||||||||||||||||
+            UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.GetActiveScene();
+            string sceneName = activeScene.name;
+            string sceneVolumetricsFolder = "Assets/BakedVolumetrics/Data/" + sceneName;
+            string voxelAssetPath = sceneVolumetricsFolder + "/" + string.Format("{0}_result.asset", voxelName);
+
+            RenderTextureConverter renderTextureConverter = new RenderTextureConverter(slicer, rendertextureformat, textureformat);
+            renderTextureConverter.Save3D(volumeWrite, voxelAssetPath, new RenderTextureConverter.TextureObjectSettings() { anisoLevel = 0, filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Repeat });
+
+            volumeWrite.Release();
+
+            if (directionalLightsBuffer != null) directionalLightsBuffer.Release();
+            if (pointLightsBuffer != null) pointLightsBuffer.Release();
+            if (spotLightsBuffer != null) spotLightsBuffer.Release();
+            if (areaLightsBuffer != null) areaLightsBuffer.Release();
+        }
+
+        [ContextMenu("Generate Buffers")]
         public void GenerateVolumes()
         {
             if (bakeAlbedo) GenerateVolume(cameraVoxelAlbedoShader, string.Format("{0}_albedo", voxelName), rendertextureformat, textureformat);
             if (bakeEmissive) GenerateVolume(cameraVoxelEmissiveShader, string.Format("{0}_emissive", voxelName), rendertextureformat, textureformat);
             if (bakeNormal) GenerateVolume(cameraVoxelNormalShader, string.Format("{0}_normal", voxelName), rendertextureformat, textureformat);
-            if (bakePosition) GenerateVolume(cameraVoxelPositionShader, string.Format("{0}_position", voxelName), rendertextureformat, textureformat);
+            //if (bakePosition) GenerateVolume(cameraVoxelPositionShader, string.Format("{0}_position", voxelName), rendertextureformat, textureformat);
+            if (bakePosition) GenerateWorldPositionVolume(string.Format("{0}_position", voxelName));
+        }
+
+        [ContextMenu("Generate Buffers and Trace Scene")]
+        public void GenerateBuffersAndTraceScene()
+        {
+            GenerateVolumes();
+            TraceScene();
+        }
+
+        public void GenerateWorldPositionVolume(string filename)
+        {
+            //--------------------- COMBINE RESULTS ---------------------
+            Texture3D result = new Texture3D(voxelResolution.x, voxelResolution.y, voxelResolution.z, DefaultFormat.HDR, TextureCreationFlags.None);
+            result.filterMode = FilterMode.Point;
+
+            for (int x = 0; x < result.width; x++)
+            {
+                for (int y = 0; y < result.height; y++)
+                {
+                    for (int z = 0; z < result.depth; z++)
+                    {
+                        float x_offset = voxelSize.x / voxelResolution.x;
+                        float y_offset = voxelSize.y / voxelResolution.y;
+                        float z_offset = voxelSize.z / voxelResolution.z;
+                        Vector3 probePosition = new Vector3(transform.position.x + (x * x_offset), transform.position.y + (y * y_offset), transform.position.z + (z * z_offset));
+
+                        Color colorResult = new Color(probePosition.x, probePosition.y, probePosition.z, 1.0f);
+
+                        result.SetPixel(x, y, z, colorResult);
+                    }
+                }
+            }
+
+            //--------------------- FINAL ---------------------
+            SaveVolumeTexture(filename, result);
         }
 
         public void GenerateVolume(Shader replacementShader, string filename, RenderTextureFormat rtFormat, TextureFormat texFormat)
@@ -406,6 +623,20 @@ namespace BakedVolumetrics
                     }
                 }
             }
+        }
+
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| UTILITIES ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| UTILITIES ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| UTILITIES ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+        public void UpdateProgressBar(string description, float progress)
+        {
+            EditorUtility.DisplayProgressBar("Voxelizer", description, progress);
+        }
+
+        public void CloseProgressBar()
+        {
+            EditorUtility.ClearProgressBar();
         }
     }
 }

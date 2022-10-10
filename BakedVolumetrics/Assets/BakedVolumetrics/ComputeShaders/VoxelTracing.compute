@@ -1,24 +1,15 @@
-Texture2D<float4> Read;
-RWTexture3D<float4> Write;
-
-float3 VolumeResolution;
-int layerIndex;
-
-SamplerState _PointClamp;
-SamplerState _LinearClamp;
-
 struct LightDirectional
 {
     float3 lightDirection;
     float3 lightColor;
-    float3 lightIntensity;
+    float lightIntensity;
 };
 
 struct LightPoint
 {
     float3 lightPosition;
     float3 lightColor;
-    float3 lightIntensity;
+    float lightIntensity;
     float lightRange;
 };
 
@@ -27,8 +18,9 @@ struct LightSpot
     float3 lightPosition;
     float3 lightDirection;
     float3 lightColor;
-    float3 lightIntensity;
+    float lightIntensity;
     float lightRange;
+    float lightAngle;
 };
 
 struct LightArea
@@ -37,7 +29,7 @@ struct LightArea
     float3 lightDirection;
     float2 lightSize;
     float3 lightColor;
-    float3 lightIntensity;
+    float lightIntensity;
     float lightRange;
 };
 
@@ -46,23 +38,112 @@ RWStructuredBuffer<LightPoint> PointLights;
 RWStructuredBuffer<LightSpot> SpotLights;
 RWStructuredBuffer<LightArea> AreaLights;
 
+SamplerState _PointClamp;
+SamplerState _LinearClamp;
+
+Texture3D<float4> SceneAlbedo;
+Texture3D<float4> SceneEmissive;
+Texture3D<float4> SceneNormal;
+Texture3D<float4> ScenePosition;
+RWTexture3D<float4> Write;
+
+float4 TEX2D_SHARP(Texture2D<float4> tex, float2 uv)
+{
+    return tex.SampleLevel(_PointClamp, uv, 0);
+}
+
+float4 TEX3D_SHARP(Texture3D<float4> tex, float3 position)
+{
+    return tex.SampleLevel(_PointClamp, position, 0);
+}
+
 float4 TEX2D(Texture2D<float4> tex, float2 uv)
 {
     return tex.SampleLevel(_LinearClamp, uv, 0);
+}
+
+float4 TEX3D(Texture3D<float4> tex, float3 position)
+{
+    return tex.SampleLevel(_LinearClamp, position, 0);
+}
+
+//properties
+float3 VolumeResolution;
+
+float3 SampleNormals(float3 voxelPosition, float3 id, float sceneAlpha)
+{
+    float yNegative = 0;
+
+    for (int y_neg = 0; y_neg < VolumeResolution.y; y_neg++)
+    {
+
+    }
+
+    return float3(0, 0, 0);
 }
 
 #pragma kernel CSMain
 [numthreads(8,8,8)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    uint3 newIndex = uint3(id.x, id.y, layerIndex);
+    int pi = 3.14159;
+    float3 voxelPosition = id.xyz + float3(0.5, 0.5, 0.5);
+    voxelPosition /= VolumeResolution.xyz;
 
-    float2 uv = id.xy + float2(0.5, 0.5);
-    uv /= VolumeResolution.xy;
+    //buffers
+    float4 sceneAlbedo = TEX3D_SHARP(SceneAlbedo, voxelPosition);
+    float4 sceneEmissive = TEX3D_SHARP(SceneEmissive, voxelPosition);
+    //float4 sceneNormal = TEX3D_SHARP(SceneNormal, voxelPosition) * 2.0f - 1.0f;
+    float4 scenePosition = TEX3D_SHARP(ScenePosition, voxelPosition);
 
-    float4 voxelSlice = TEX2D(Read, uv);
+    float3 worldPosition = scenePosition + voxelPosition;
 
-    Write[newIndex] = float4(voxelSlice.rgb, 0.0);
+    //SAMPLE NORMAL
+    float3 sceneNormal = SampleNormals(voxelPosition, float3(id.x, id.y, id.z), sceneAlbedo.a);
+    
+    //trace lights
+    float4 finalColor = float4(0, 0, 0, sceneAlbedo.a);
 
-    //Write[newIndex] = float4(newIndex.x, newIndex.y, newIndex.z, 0.0);
+    //finalColor.rgb += float3(1,1,1) * dot(sceneNormal, float3(1, 1, 0));
+
+    //spot lights
+    for (int i = 0; i < SpotLights.Length; i++)
+    {
+        LightSpot spot = SpotLights[i];
+
+        float lightDistance = distance(spot.lightPosition, worldPosition);
+
+        float3 lightColorSample = SpotLights[i].lightColor * SpotLights[i].lightIntensity;
+        float lightDistanceSample = 1.0f / (lightDistance * lightDistance);
+        float3 lightWorldDirection = normalize(worldPosition - spot.lightPosition);
+        float lightAngle = dot(lightWorldDirection, normalize(spot.lightDirection));
+        lightAngle = lightAngle * 180;
+
+        //lightDistanceSample *= SpotLights[i].lightRange;
+
+        if (lightAngle > SpotLights[i].lightAngle)
+            finalColor.rgb += lightColorSample * lightDistanceSample;
+
+        /*
+        float3 currentVoxelRayPos = voxelPosition;
+        float3 currentVoxelRayDir = lightWorldDirection;
+
+        for (int j = 0; j < 32; j++)
+        {
+            float4 newSample = TEX3D(SceneAlbedo, currentVoxelRayPos.xyz);
+
+            //if (lightAngle > SpotLights[i].lightAngle && newSample.a != 0.0f)
+            {
+                finalColor.rgb += lightColorSample * lightDistanceSample;
+            }
+
+            currentVoxelRayPos += currentVoxelRayDir * float3(1.0f / VolumeResolution.x, 1.0f / VolumeResolution.y, 1.0f / VolumeResolution.z);
+        }
+        */
+    }
+
+    finalColor.rgb *= sceneAlbedo.rgb;
+    finalColor = max(0.0f, finalColor);
+
+    Write[id.xyz] = finalColor;
 }

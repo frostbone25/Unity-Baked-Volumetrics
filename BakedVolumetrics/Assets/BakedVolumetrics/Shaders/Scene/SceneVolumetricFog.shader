@@ -6,7 +6,7 @@
         _VolumeTexture("Volume Texture", 3D) = "white" {}
         _VolumePos("Volume World Position", Vector) = (0, 0, 0, 0)
         _VolumeSize("Volume World Size", Vector) = (0, 0, 0, 0)
-        _VolumeDensity("Volume Density", Float) = 0
+        _VolumeDensity("Volume Density", Float) = 1
 
         [Header(Raymarching)]
         _RaymarchStepSize("Raymarch Step Size", Float) = 25

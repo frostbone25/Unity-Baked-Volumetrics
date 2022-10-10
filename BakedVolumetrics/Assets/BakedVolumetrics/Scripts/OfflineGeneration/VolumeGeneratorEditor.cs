@@ -78,11 +78,17 @@ namespace BakedVolumetrics
             //scriptObject.sampleRaytrace.showUI = lightingSourceValue == LightingSource.CPU_Raytracer || lightingSourceValue == LightingSource.Combined;
             //scriptObject.sampleLightprobe.showUI = lightingSourceValue == LightingSource.Lightprobes || lightingSourceValue == LightingSource.Combined;
 
+            //||||||||||||||||||||||||||||||||| VOLUME PROPERTIES |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME PROPERTIES |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME PROPERTIES |||||||||||||||||||||||||||||||||
             EditorGUILayout.LabelField("Volume Properties", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(volumeName);
             EditorGUILayout.PropertyField(volumeSize);
             EditorGUILayout.Space(10);
 
+            //||||||||||||||||||||||||||||||||| VOLUME QUALITY |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME QUALITY |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME QUALITY |||||||||||||||||||||||||||||||||
             EditorGUILayout.LabelField("Volume Quality", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(volumeBitDepth);
             EditorGUILayout.PropertyField(voxelCalculation);
@@ -98,6 +104,9 @@ namespace BakedVolumetrics
             EditorGUILayout.LabelField(string.Format("[{0}x{1}x{2}] {3} voxels.", scriptObject.GetVoxelResolution().x, scriptObject.GetVoxelResolution().y, scriptObject.GetVoxelResolution().z, scriptObject.GetTotalVoxelCount()), EditorStyles.helpBox);
             EditorGUILayout.Space(10);
 
+            //||||||||||||||||||||||||||||||||| VOLUME RENDERING |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME RENDERING |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME RENDERING |||||||||||||||||||||||||||||||||
             EditorGUILayout.LabelField("Volume Rendering", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(raymarchSamples);
             EditorGUILayout.PropertyField(lightingSource);
@@ -123,6 +132,10 @@ namespace BakedVolumetrics
             }
             */
 
+            //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
+            EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Volume Density", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(densityType);
 
@@ -132,7 +145,7 @@ namespace BakedVolumetrics
             {
                 EditorGUILayout.PropertyField(densityConstant);
             }
-            else if (densityTypeValue == DensityType.HeightBased)
+            else if (densityTypeValue == DensityType.HeightBased || densityTypeValue == DensityType.HeightBasedLuminance)
             {
                 EditorGUILayout.PropertyField(densityTop);
                 EditorGUILayout.PropertyField(densityBottom);
@@ -141,8 +154,10 @@ namespace BakedVolumetrics
                 EditorGUILayout.PropertyField(densityHeightFallof);
             }
 
+            //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
             EditorGUILayout.Space(10);
-
             EditorGUILayout.LabelField("Gizmos", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(previewBounds);
 
@@ -152,6 +167,9 @@ namespace BakedVolumetrics
             EditorGUILayout.PropertyField(previewVoxels);
             EditorGUILayout.Space(10);
 
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
             if (GUILayout.Button("Update Material"))
             {
                 scriptObject.UpdateMaterial();
