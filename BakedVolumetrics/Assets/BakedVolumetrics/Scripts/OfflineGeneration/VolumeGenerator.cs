@@ -18,7 +18,6 @@ namespace BakedVolumetrics
         public string volumeName = "Volume";
 
         public LightingSource lightingSource = LightingSource.LightProbes;
-        public RenderingStyle renderingStyle = RenderingStyle.SceneObject;
         public CombineColorType combineColorType = CombineColorType.Additive;
         public float additiveLightprobeIntensity = 1.0f;
         public float additiveRaytracedIntensity = 1.0f;

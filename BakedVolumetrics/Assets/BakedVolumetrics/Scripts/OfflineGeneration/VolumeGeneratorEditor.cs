@@ -14,7 +14,6 @@ namespace BakedVolumetrics
     public class VolumeGeneratorEditor : Editor
     {
         SerializedProperty lightingSource;
-        SerializedProperty renderingStyle;
         SerializedProperty volumeName;
         SerializedProperty volumeSize;
         SerializedProperty volumeBitDepth;
@@ -43,7 +42,6 @@ namespace BakedVolumetrics
             volumeName = serializedObject.FindProperty("volumeName");
             volumeSize = serializedObject.FindProperty("volumeSize");
             lightingSource = serializedObject.FindProperty("lightingSource");
-            renderingStyle = serializedObject.FindProperty("renderingStyle");
             volumeBitDepth = serializedObject.FindProperty("volumeBitDepth");
             voxelCalculation = serializedObject.FindProperty("voxelCalculation");
             customVolumeResolution = serializedObject.FindProperty("customVolumeResolution");
@@ -110,7 +108,6 @@ namespace BakedVolumetrics
             EditorGUILayout.LabelField("Volume Rendering", EditorStyles.whiteLargeLabel);
             EditorGUILayout.PropertyField(raymarchSamples);
             EditorGUILayout.PropertyField(lightingSource);
-            EditorGUILayout.PropertyField(renderingStyle);
 
             /*
             if(lightingSourceValue == LightingSource.Combined)

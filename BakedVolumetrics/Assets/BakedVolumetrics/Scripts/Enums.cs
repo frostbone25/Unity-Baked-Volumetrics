@@ -38,12 +38,6 @@ namespace BakedVolumetrics
         CPU_Raytrace
     }
 
-    public enum RenderingStyle
-    {
-        SceneObject,
-        PostProcess
-    }
-
     public enum AttenuationType
     {
         Linear,
