@@ -1,0 +1,34 @@
+SamplerState _PointClamp;
+SamplerState _LinearClamp;
+
+float4 TEX2D_SHARP(Texture2D<float4> tex, float2 uv, float mipLevel)
+{
+    return tex.SampleLevel(_PointClamp, uv, 0);
+}
+
+float4 TEX2D(Texture2D<float4> tex, float2 uv, float mipLevel)
+{
+    return tex.SampleLevel(_LinearClamp, uv, 0);
+}
+
+Texture2D<float4> Texture1;
+Texture2D<float4> Texture2;
+RWTexture2D<float4> Result;
+
+float2 TextureResolution;
+
+#pragma kernel CSMain
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv = id.xy + float2(0.5, 0.5);
+    uv /= TextureResolution.xy;
+
+    float4 color1 = TEX2D(Texture1, uv, 0);
+    //float4 color2 = TEX2D(Texture2, uv, 0);
+    //float4 combinedColor = (color1 + color2) / 2.0f;
+    //float4 combinedColor = (color1 + color2);
+
+    //Result[id.xy] = color1 + color2;
+    Result[id.xy] += color1;
+}

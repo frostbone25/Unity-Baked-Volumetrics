@@ -14,7 +14,6 @@ namespace BakedVolumetrics
     public class VolumeGeneratorEditor : Editor
     {
         SerializedProperty lightingSource;
-        SerializedProperty volumeName;
         SerializedProperty volumeSize;
         SerializedProperty volumeBitDepth;
         SerializedProperty voxelCalculation;
@@ -39,7 +38,6 @@ namespace BakedVolumetrics
 
         void OnEnable()
         {
-            volumeName = serializedObject.FindProperty("volumeName");
             volumeSize = serializedObject.FindProperty("volumeSize");
             lightingSource = serializedObject.FindProperty("lightingSource");
             volumeBitDepth = serializedObject.FindProperty("volumeBitDepth");
@@ -73,6 +71,7 @@ namespace BakedVolumetrics
             LightingSource lightingSourceValue = (LightingSource)lightingSource.intValue;
             scriptObject.sampleCPURaytrace.showUI = lightingSourceValue == LightingSource.CPU_Raytrace;
             scriptObject.sampleLightprobe.showUI = lightingSourceValue == LightingSource.LightProbes;
+            scriptObject.sampleIBL.showUI = lightingSourceValue == LightingSource.IBL;
             //scriptObject.sampleRaytrace.showUI = lightingSourceValue == LightingSource.CPU_Raytracer || lightingSourceValue == LightingSource.Combined;
             //scriptObject.sampleLightprobe.showUI = lightingSourceValue == LightingSource.Lightprobes || lightingSourceValue == LightingSource.Combined;
 
@@ -80,7 +79,6 @@ namespace BakedVolumetrics
             //||||||||||||||||||||||||||||||||| VOLUME PROPERTIES |||||||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||||||| VOLUME PROPERTIES |||||||||||||||||||||||||||||||||
             EditorGUILayout.LabelField("Volume Properties", EditorStyles.whiteLargeLabel);
-            EditorGUILayout.PropertyField(volumeName);
             EditorGUILayout.PropertyField(volumeSize);
             EditorGUILayout.Space(10);
 

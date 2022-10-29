@@ -35,7 +35,8 @@ namespace BakedVolumetrics
     {
         LightProbes,
         VoxelRaytrace,
-        CPU_Raytrace
+        CPU_Raytrace,
+        IBL
     }
 
     public enum AttenuationType

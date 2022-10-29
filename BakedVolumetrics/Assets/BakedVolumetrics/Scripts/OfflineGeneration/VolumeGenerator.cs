@@ -15,7 +15,7 @@ namespace BakedVolumetrics
     public class VolumeGenerator : MonoBehaviour
     {
         //public
-        public string volumeName = "Volume";
+        public string volumeName { get { return gameObject.name; } }
 
         public LightingSource lightingSource = LightingSource.LightProbes;
         public CombineColorType combineColorType = CombineColorType.Additive;
@@ -47,6 +47,7 @@ namespace BakedVolumetrics
         public SampleLightprobe sampleLightprobe;
         public SampleVoxelRaytrace sampleVoxelRaytrace;
         public SampleCPURaytrace sampleCPURaytrace;
+        public SampleIBL sampleIBL;
         public VolumePostFilters volumePostFilters;
 
         //private
@@ -121,6 +122,7 @@ namespace BakedVolumetrics
             sampleLightprobe = gameObject.GetComponent<SampleLightprobe>();
             volumePostFilters = gameObject.GetComponent<VolumePostFilters>();
             sampleVoxelRaytrace = gameObject.GetComponent<SampleVoxelRaytrace>();
+            sampleIBL = gameObject.GetComponent<SampleIBL>();
 
             if (sampleLightprobe == null)
                 sampleLightprobe = gameObject.AddComponent<SampleLightprobe>();
@@ -130,6 +132,9 @@ namespace BakedVolumetrics
 
             if (sampleCPURaytrace == null)
                 sampleCPURaytrace = gameObject.AddComponent<SampleCPURaytrace>();
+
+            if (sampleIBL == null)
+                sampleIBL = gameObject.AddComponent<SampleIBL>();
 
             if (volumePostFilters == null)
                 volumePostFilters = gameObject.AddComponent<VolumePostFilters>();
@@ -231,6 +236,8 @@ namespace BakedVolumetrics
                 colorResult = sampleCPURaytrace.SampleVolumetricColor(probePosition, voxelWorldSize);
             else if (lightingSource == LightingSource.LightProbes)
                 colorResult = sampleLightprobe.SampleVolumetricColor(probePosition, voxelWorldSize);
+            else if (lightingSource == LightingSource.IBL)
+                colorResult = sampleIBL.SampleVolumetricColor(probePosition, voxelWorldSize);
             /*
             if (lightingSource == LightingSource.Combined)
             {
@@ -244,9 +251,9 @@ namespace BakedVolumetrics
             }
             */
 
-            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+                //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+                //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+                //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
             float alphaResult = 1.0f;
 
             if (densityType == DensityType.Constant)
@@ -286,6 +293,8 @@ namespace BakedVolumetrics
 
         public void GenerateVolume()
         {
+            double timeBeforeBake = Time.realtimeSinceStartupAsDouble;
+
             UpdateProgressBar("Setting up and creating 3d texture...", 0.25f);
 
             if (volumeTexture != null)
@@ -301,7 +310,13 @@ namespace BakedVolumetrics
             SetupSceneColliders();
             CalculateResolution();
 
-            UpdateProgressBar("Sampling colors into 3d texture...", 0.5f);
+            if (lightingSource == LightingSource.IBL)
+                sampleIBL.Setup();
+
+            if (fogSceneObject != null)
+                fogSceneObject.SetActive(false);
+
+            UpdateProgressBar("Rendering volume...", 0.5f);
 
             for (int x = -volumeResolution.x / 2; x <= volumeResolution.x / 2; x++)
             {
@@ -322,9 +337,18 @@ namespace BakedVolumetrics
 
             volumeTexture.Apply();
 
+            if (lightingSource == LightingSource.IBL)
+                sampleIBL.Cleanup();
+
+            if (fogSceneObject != null)
+                fogSceneObject.SetActive(true);
+
             SaveVolumeTexture(volumeTexture);
             RemoveSceneColliders();
             UpdateMaterial();
+
+            double timeAfterBake = Time.realtimeSinceStartupAsDouble - timeBeforeBake;
+            Debug.Log(string.Format("'{0}' took {1} seconds to bake.", volumeName, timeAfterBake));
         }
 
         private void SaveVolumeTexture(Texture3D tex3D)
