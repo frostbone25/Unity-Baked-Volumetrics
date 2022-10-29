@@ -28,7 +28,7 @@ Overview: This is basically lightmapping but for volumetric lighting and fog.
 
 - Completely baked volumetric lighting designed to be lightweight, and is baked completely offline in-editor.
 - Volumetric lighting are sampled from either the scene light probes, or a custom CPU raytacer (or a voxelized GPU raytracer which is in the works). 
-- Different density types for the fog. Constant, Luminance Based, or Height Based.
+- Different density types for the fog. Constant, Luminance Based, or Height Based. Density is baked into the 3d texture (RGB: Color A: Density).
 - Adjustments can be applied to tweak the look of the generated volume, along with a 3D Gaussian blur can be applied to improve the quality of the bake.
 - There is a non post process scene based version, and a post process version.
 
