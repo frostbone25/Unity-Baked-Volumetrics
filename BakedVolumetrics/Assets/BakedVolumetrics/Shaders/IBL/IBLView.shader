@@ -8,6 +8,7 @@ Shader "Hidden/IBLView"
     {
         Tags
         {
+            "LightMode" = "ForwardBase"
             "Queue" = "AlphaTest"
             "RenderType" = "TransparentCutout"
             "IgnoreProjector" = "True"
@@ -15,8 +16,8 @@ Shader "Hidden/IBLView"
         }
 
         Cull Off
-        ZTest Always
-        ZWrite On
+        //ZTest Always
+        //ZWrite On
 
             Pass
             {
@@ -25,6 +26,7 @@ Shader "Hidden/IBLView"
                 #pragma fragment frag
                 #pragma multi_compile_fwdbase
                 #pragma multi_compile _ LIGHTMAP_ON
+                #pragma multi_compile _ UNITY_LIGHTMAP_FULL_HDR
 
                 #include "UnityCG.cginc"
 
@@ -38,9 +40,12 @@ Shader "Hidden/IBLView"
                 {
                     v2f o;
 
+#if defined(LIGHTMAP_ON)
                     o.vertex = UnityObjectToClipPos(v.vertex);
                     o.uvStaticLightmap.xy = v.texcoord1.xy * unity_LightmapST.xy + unity_LightmapST.zw;
-
+#else
+                    o.vertex = float4(0, 0, 0, 0);
+#endif
                     return o;
                 }
 
@@ -50,20 +55,20 @@ Shader "Hidden/IBLView"
                         float2 lightmapUVs = i.uvStaticLightmap.xy;
                         float4 indirectLightmap = UNITY_SAMPLE_TEX2D(unity_Lightmap, lightmapUVs.xy);
 
-                        #if defined(UNITY_LIGHTMAP_FULL_HDR)
+                        //#if defined(UNITY_LIGHTMAP_FULL_HDR)
                             indirectLightmap.rgb = DecodeLightmap(indirectLightmap);
-                        #else
+                        //#else
                             // decodeInstructions.x contains 2.0 when gamma color space is used or pow(2.0, 2.2) = 4.59 when linear color space is used on mobile platforms
-                            indirectLightmap.rgb *= 4.59;
-                        #endif
+                            //indirectLightmap.rgb *= 4.59;
+                        //#endif
 
                         return float4(indirectLightmap.rgb, 1.0f);
                     #else
-                        clip(0.0f);
                         return float4(0.0f, 0.0f, 0.0f, 0.0f);
                     #endif
                 }
                 ENDCG
             }
         }
+        Fallback "VertexLit"
 }

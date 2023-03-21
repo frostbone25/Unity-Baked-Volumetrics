@@ -47,8 +47,12 @@ namespace BakedVolumetrics
                 IBLCamera.forceIntoRenderTexture = true;
                 IBLCamera.nearClipPlane = 0.01f;
                 IBLCamera.farClipPlane = 1000.0f;
+                IBLCamera.renderingPath = RenderingPath.Forward;
+                IBLCamera.allowHDR = true;
+                IBLCamera.fieldOfView = 90.0f;
                 IBLCamera.backgroundColor = Color.black;
-                IBLCamera.clearFlags = CameraClearFlags.SolidColor;
+                //IBLCamera.clearFlags = CameraClearFlags.SolidColor;
+                IBLCamera.clearFlags = CameraClearFlags.Skybox | CameraClearFlags.SolidColor;
             }
 
             if(IBLView == null)
@@ -104,18 +108,17 @@ namespace BakedVolumetrics
 
             //IBLCamera.SetReplacementShader(IBLView, "");
 
-            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
-            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
-            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
-
-            //front (+X)  
-            if(IBLCameraRender == null)
+            if (IBLCameraRender == null)
             {
                 IBLCameraRender = new RenderTexture(sampleResolution, sampleResolution, 0, rtFormat);
                 IBLCameraRender.Create();
             }
 
             IBLCamera.targetTexture = IBLCameraRender;
+
+            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
 
             //front (+X)  
             IBLCamera.transform.Rotate(0, 90, 0);
@@ -154,7 +157,8 @@ namespace BakedVolumetrics
             //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
 
-            return IBLComputeProxy.GetPixelBilinear(0.5f, 0.5f, IBLComputeResult.mipmapCount - 1) / 6.0f;
+            return IBLComputeProxy.GetPixelBilinear(0.5f, 0.5f, IBLComputeResult.mipmapCount - 1);
+            //return IBLComputeProxy.GetPixelBilinear(0.5f, 0.5f, IBLComputeResult.mipmapCount - 1) / 6.0f;
         }
 
         public void Cleanup()
