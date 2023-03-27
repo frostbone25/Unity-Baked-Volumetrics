@@ -57,7 +57,7 @@ First implementation of the effect implemented as a scene based effect. This is 
 
 This REQUIRES camera depth generation enabled. This works automatically for deferred rendering, but not for forward rendering by default. You can enable it by using C# scripting. However if you don't have access to the main camera properties there are other ways of enabling it.
 
-***Camera Depth Texture Trick 1:*** If the post processing stack is avaliable, you can enable ambient occlusion which will enable the camera depth texture generation flag. For a low overhead put the AO quality settings at its lowest if you don't intend to use it. *(The intensity value also needs to be greater than 0 otherwise the effect won't be active)*
+***Camera Depth Texture Trick 1:*** If the post processing stack is avaliable, you can enable ambient occlusion which will enable the camera depth texture generation flag. *(For a low overhead put the AO quality settings at its lowest if you don't intend to use it. The intensity value also needs to be greater than 0 otherwise the effect won't be active)*
 
 ***Camera Depth Texture Trick 2:***  Courtesy of [orels1](https://github.com/orels1), Create a directional light, that casts shadows. Set the culling layer on that directional light to hit a specific layer which will cause unity to enable camera depth texture generation.
 
@@ -67,7 +67,7 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 
 ### Advantages
 
-- Fast, because at runtime a 3D texture is sampled and raymarched against the scene depth buffer. 
+- Fast, because at runtime a 3D texture is sampled and raymarched against the scene depth buffer. No additional (sampling of lights and shadowmaps, etc.) are performed.
 - The look of the volumetrics are generated purely offline. With the nature of it being offline you can apply alot more computation and processing to sample things like indirect lighting which completely transforms the look of the fog.
 
 ### Drawbacks
