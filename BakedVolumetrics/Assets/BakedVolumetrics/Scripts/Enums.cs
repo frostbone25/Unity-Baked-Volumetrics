@@ -52,5 +52,12 @@ namespace BakedVolumetrics
         HeightBased,
         HeightBasedLuminance
     }
+
+    public enum VoxelPreviewAxis
+    {
+        X,
+        Y,
+        Z
+    }
 }
 #endif

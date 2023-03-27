@@ -165,14 +165,33 @@ namespace BakedVolumetrics
             //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-            if (GUILayout.Button("Update Material"))
-            {
-                scriptObject.UpdateMaterial();
-            }
+            EditorGUILayout.LabelField("Generation", EditorStyles.whiteLargeLabel);
+
 
             if (GUILayout.Button("Generate Volume"))
             {
-                scriptObject.GenerateVolume();
+                scriptObject.GenerateVolume(0);
+            }
+
+            if (GUILayout.Button("Generate Volume with Post Effects"))
+            {
+                scriptObject.GenerateVolume(1);
+            }
+
+            if (GUILayout.Button("Apply Post Effects Only"))
+            {
+                scriptObject.GenerateVolume(2);
+            }
+
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Utility", EditorStyles.whiteLargeLabel);
+
+            if (GUILayout.Button("Update Material"))
+            {
+                scriptObject.UpdateMaterial();
             }
 
             serializedObject.ApplyModifiedProperties();

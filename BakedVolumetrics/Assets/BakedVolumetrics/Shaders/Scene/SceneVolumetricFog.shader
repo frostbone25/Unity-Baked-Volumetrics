@@ -6,7 +6,6 @@
         _VolumeTexture("Volume Texture", 3D) = "white" {}
         _VolumePos("Volume World Position", Vector) = (0, 0, 0, 0)
         _VolumeSize("Volume World Size", Vector) = (0, 0, 0, 0)
-        _VolumeDensity("Volume Density", Float) = 1
 
         [Header(Raymarching)]
         _RaymarchStepSize("Raymarch Step Size", Float) = 25
@@ -35,6 +34,7 @@
             #pragma multi_compile SAMPLES_8 SAMPLES_16 SAMPLES_24 SAMPLES_32 SAMPLES_48 SAMPLES_64 SAMPLES_128
             #include "UnityCG.cginc"
 
+            //#define AnimateNoise
 
 #ifdef SAMPLES_8
 #define _RaymarchSteps 8
@@ -78,7 +78,6 @@
             sampler3D_half _VolumeTexture;
             fixed4 _VolumePos;
             fixed4 _VolumeSize;
-            fixed _VolumeDensity;
 
             fixed _RaymarchStepSize;
 
@@ -112,7 +111,6 @@
 
                 return o;
             }
-
 
             fixed4 frag(v2f i) : SV_Target
             {
@@ -149,7 +147,11 @@
                 fixed3 scaledCameraPos = ((_WorldSpaceCameraPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
 
                 //compute jitter
-                fixed jitter = 1.0f + noise(screenUV.xy * 10000.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+                #if defined (AnimateNoise)
+                fixed jitter = 1.0f + noise(fixed2(screenUV.x + _Time.y, screenUV.y + _Time.y) * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+                #else
+                fixed jitter = 1.0f + noise(screenUV.xy * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+                #endif
 
                 //get our ray increment vector that we use so we can march into the scene. Jitter it also so we can mitigate banding/stepping artifacts
                 fixed3 raymarch_rayIncrement = normalize(i.camRelativeWorldPos.xyz) / _RaymarchSteps;
@@ -185,8 +187,8 @@
                             fixed4 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0));
 
                             //accumulate the samples
-                            result += fixed4(sampledColor.rgb, sampledColor.a * _VolumeDensity) * stepLength; //this is slightly cheaper
-                            //result += fixed4(sampledColor.rgb, sampledColor.a * exp(_VolumeDensity)) * stepLength; //uses exponential falloff, looks a little nicer but may not be needed
+                            result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //this is slightly cheaper
+                            //result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //uses exponential falloff, looks a little nicer but may not be needed
                         }
                         else
                             break; //terminante the ray 

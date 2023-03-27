@@ -70,8 +70,8 @@ MonoBehaviour:
     overrideState: 0
     value: 0
   postExposure:
-    overrideState: 0
-    value: 0
+    overrideState: 1
+    value: 1
   contrast:
     overrideState: 0
     value: 0
@@ -1329,7 +1329,7 @@ MonoBehaviour:
     value: 1
   volume:
     overrideState: 1
-    value: {fileID: 0}
+    value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
     defaultState: 1
   jitter:
     overrideState: 1
@@ -1340,7 +1340,49 @@ MonoBehaviour:
     value: 1
   stepSize:
     overrideState: 1
-    value: 25
+    value: 50
+  jitterStrength:
+    overrideState: 1
+    value: 2
+  volumeResolution:
+    overrideState: 1
+    value: {x: 92, y: 29, z: 62}
+  volumePosition:
+    overrideState: 1
+    value: {x: -5, y: 14.5, z: 1}
+  volumeSize:
+    overrideState: 1
+    value: {x: 92, y: 29, z: 62}
+--- !u!114 &-3590662874747151992
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dffda2f8e3ff96e47a10929280e5885b, type: 3}
+  m_Name: BakedVolumetricsV2
+  m_EditorClassIdentifier: 
+  active: 0
+  enabled:
+    overrideState: 1
+    value: 1
+  volume:
+    overrideState: 1
+    value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
+    defaultState: 1
+  jitter:
+    overrideState: 1
+    value: {fileID: 2800000, guid: b279cbca442fec5409163a21328c9e35, type: 2}
+    defaultState: 1
+  density:
+    overrideState: 1
+    value: 1
+  stepSize:
+    overrideState: 1
+    value: 50
   jitterStrength:
     overrideState: 1
     value: 2
@@ -1368,3 +1410,4 @@ MonoBehaviour:
   settings:
   - {fileID: -7693575959006385970}
   - {fileID: -6904380953964002115}
+  - {fileID: -3590662874747151992}

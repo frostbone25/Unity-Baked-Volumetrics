@@ -5,6 +5,7 @@ using UnityEngine.Rendering;
 using UnityEngine;
 using UnityEditor;
 using System.IO;
+using UnityEditor.XR.Management;
 
 namespace BakedVolumetrics
 {
@@ -133,6 +134,21 @@ namespace BakedVolumetrics
 
             //AssetDatabase.DeleteAsset(assetRealtivePath);
             AssetDatabase.CreateAsset(output, assetRealtivePath);
+        }
+
+        public static Texture3D Duplicate3DTexture(Texture3D source)
+        {
+            Texture3D duplicate = new Texture3D(source.width, source.height, source.depth, source.format, source.mipmapCount);
+            duplicate.wrapMode = source.wrapMode;
+            duplicate.anisoLevel = source.anisoLevel;
+            duplicate.filterMode = source.filterMode;
+
+            for (int i = 0; i < source.mipmapCount; i++)
+            {
+                duplicate.SetPixels(source.GetPixels(i), i);
+            }
+
+            return duplicate;
         }
     }
 }

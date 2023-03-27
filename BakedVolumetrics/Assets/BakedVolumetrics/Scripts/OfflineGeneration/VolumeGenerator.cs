@@ -291,67 +291,87 @@ namespace BakedVolumetrics
             volumeTexture.SetPixel(volumeTexturePosition.x, volumeTexturePosition.y, volumeTexturePosition.z, colorResult);
         }
 
-        public void GenerateVolume()
+        public void GenerateVolume(int mode)
         {
             double timeBeforeBake = Time.realtimeSinceStartupAsDouble;
 
-            UpdateProgressBar("Setting up and creating 3d texture...", 0.25f);
-
-            if (volumeTexture != null)
-                AssetDatabase.DeleteAsset(AssetDatabase.GetAssetPath(volumeTexture));
-
-            volumeTexture = null;
-
-            volumeTexture = new Texture3D(volumeResolution.x, volumeResolution.y, volumeResolution.z, GetTextureFormat(), false);
-            volumeTexture.wrapMode = TextureWrapMode.Clamp;
-            volumeTexture.name = name;
-
-            Setup();
-            SetupSceneColliders();
-            CalculateResolution();
-
-            if (lightingSource == LightingSource.IBL)
-                sampleIBL.Setup();
-
-            if (fogSceneObject != null)
-                fogSceneObject.SetActive(false);
-
-            UpdateProgressBar("Rendering volume...", 0.5f);
-
-            for (int x = -volumeResolution.x / 2; x <= volumeResolution.x / 2; x++)
+            //generate volume (and generate volume with post effects)
+            if(mode == 0 || mode == 1)
             {
-                float x_offset = volumeSize.x / volumeResolution.x;
+                UpdateProgressBar("Setting up and creating 3d texture...", 0.25f);
 
-                for (int y = -volumeResolution.y / 2; y <= volumeResolution.y / 2; y++)
+                if (volumeTexture != null)
+                    AssetDatabase.DeleteAsset(AssetDatabase.GetAssetPath(volumeTexture));
+
+                volumeTexture = null;
+
+                volumeTexture = new Texture3D(volumeResolution.x, volumeResolution.y, volumeResolution.z, GetTextureFormat(), false);
+                volumeTexture.wrapMode = TextureWrapMode.Clamp;
+                volumeTexture.name = name;
+
+                Setup();
+                SetupSceneColliders();
+                CalculateResolution();
+
+                if (lightingSource == LightingSource.IBL)
+                    sampleIBL.Setup();
+
+                if (fogSceneObject != null)
+                    fogSceneObject.SetActive(false);
+
+                UpdateProgressBar("Rendering volume...", 0.5f);
+
+                for (int x = -volumeResolution.x / 2; x <= volumeResolution.x / 2; x++)
                 {
-                    float y_offset = volumeSize.y / volumeResolution.y;
+                    float x_offset = volumeSize.x / volumeResolution.x;
 
-                    for (int z = -volumeResolution.z / 2; z <= volumeResolution.z / 2; z++)
+                    for (int y = -volumeResolution.y / 2; y <= volumeResolution.y / 2; y++)
                     {
-                        float z_offset = volumeSize.z / volumeResolution.z;
+                        float y_offset = volumeSize.y / volumeResolution.y;
 
-                        SampleVolumetricColor(x, y, z, x_offset, y_offset, z_offset);
+                        for (int z = -volumeResolution.z / 2; z <= volumeResolution.z / 2; z++)
+                        {
+                            float z_offset = volumeSize.z / volumeResolution.z;
+
+                            SampleVolumetricColor(x, y, z, x_offset, y_offset, z_offset);
+                        }
                     }
                 }
+
+                volumeTexture.Apply();
+
+                if (lightingSource == LightingSource.IBL)
+                    sampleIBL.Cleanup();
+
+                if (fogSceneObject != null)
+                    fogSceneObject.SetActive(true);
+
+                SaveVolumeTexture(volumeTexture, mode == 1);
+                RemoveSceneColliders();
+                UpdateMaterial();
             }
+            if (mode == 2) //apply post effects to volume only
+            {
+                UpdateProgressBar("Applying post effects to volume...", 0.5f);
 
-            volumeTexture.Apply();
+                //build the paths
+                UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.GetActiveScene();
+                string sceneName = activeScene.name;
+                string sceneVolumetricsFolder = "Assets/BakedVolumetrics/Data/" + sceneName;
+                string volumeAssetName_rawSample = volumeName + "_RawSample" + ".asset";
+                string volumeAssetPath_rawSample = sceneVolumetricsFolder + "/" + volumeAssetName_rawSample;
 
-            if (lightingSource == LightingSource.IBL)
-                sampleIBL.Cleanup();
+                Texture3D source = AssetDatabase.LoadAssetAtPath<Texture3D>(volumeAssetPath_rawSample);
 
-            if (fogSceneObject != null)
-                fogSceneObject.SetActive(true);
-
-            SaveVolumeTexture(volumeTexture);
-            RemoveSceneColliders();
-            UpdateMaterial();
+                SaveVolumeTexture(source, true);
+                UpdateMaterial();
+            }
 
             double timeAfterBake = Time.realtimeSinceStartupAsDouble - timeBeforeBake;
             Debug.Log(string.Format("'{0}' took {1} seconds to bake.", volumeName, timeAfterBake));
         }
 
-        private void SaveVolumeTexture(Texture3D tex3D)
+        private void SaveVolumeTexture(Texture3D tex3D, bool applyPostEffects)
         {
             UpdateProgressBar("Saving generated 3d texture...", 0.75f);
             SetupSceneObjectVolume();
@@ -360,14 +380,28 @@ namespace BakedVolumetrics
             UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.GetActiveScene();
             string sceneName = activeScene.name;
             string sceneVolumetricsFolder = "Assets/BakedVolumetrics/Data/" + sceneName;
-            string volumeAssetName = volumeName + ".asset";
-            string volumeAssetPath = sceneVolumetricsFolder + "/" + volumeAssetName;
+            string volumeAssetName_rawSample = volumeName + "_RawSample" + ".asset";
+            string volumeAssetName_final = volumeName + ".asset";
 
-            AssetDatabase.DeleteAsset(volumeAssetPath);
-            AssetDatabase.CreateAsset(tex3D, volumeAssetPath);
+            string volumeAssetPath_rawSample = sceneVolumetricsFolder + "/" + volumeAssetName_rawSample;
+            string volumeAssetPath_final = sceneVolumetricsFolder + "/" + volumeAssetName_final;
 
-            UpdateProgressBar("Applying post effects to 3d texture...", 0.9f);
-            volumePostFilters.ApplyPostEffects(volumeAssetPath, GetTextureFormat(), GetRenderTextureFormat());
+            AssetDatabase.DeleteAsset(volumeAssetPath_rawSample);
+            AssetDatabase.CreateAsset(tex3D, volumeAssetPath_rawSample);
+
+            if(applyPostEffects)
+            {
+                UpdateProgressBar("Applying post effects to 3d texture...", 0.9f);
+                volumePostFilters.ApplyPostEffects(volumeAssetPath_rawSample, volumeAssetPath_final, GetTextureFormat(), GetRenderTextureFormat());
+            }
+            else //if there are no post adjustments applied
+            {
+                Texture3D duplicateSourceVolume = RenderTextureConverter.Duplicate3DTexture(AssetDatabase.LoadAssetAtPath<Texture3D>(volumeAssetPath_rawSample));
+                AssetDatabase.CreateAsset(duplicateSourceVolume, volumeAssetPath_final);
+            }
+
+            //FIX: reimport asset
+            AssetDatabase.ImportAsset(volumeAssetPath_final);
 
             CloseProgressBar();
         }

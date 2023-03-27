@@ -37,34 +37,30 @@ namespace BakedVolumetrics
 
         private void GetResources()
         {
-            if (adjustments == null)
-                adjustments = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/Adjustments3D.compute");
-
-            if (gaussian3D == null)
-                gaussian3D = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/GaussianBlur3D.compute");
-
-            if (slicer == null)
-                slicer = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/Slicer.compute");
+            if (adjustments == null) adjustments = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/Adjustments3D.compute");
+            if (gaussian3D == null) gaussian3D = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/GaussianBlur3D.compute");
+            if (slicer == null) slicer = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/BakedVolumetrics/ComputeShaders/Slicer.compute");
         }
 
-        public void ApplyPostEffects(string volumeAssetPath, TextureFormat textureFormat, RenderTextureFormat renderTextureFormat)
+        public void ApplyPostEffects(string sourceVolumeAssetPath, string destinationVolumeAssetPath, TextureFormat textureFormat, RenderTextureFormat renderTextureFormat)
         {
             this.renderTextureFormat = renderTextureFormat;
             this.textureFormat = textureFormat;
 
             GetResources();
 
+            Texture3D sourceVolume = AssetDatabase.LoadAssetAtPath<Texture3D>(sourceVolumeAssetPath);
+            AssetDatabase.DeleteAsset(destinationVolumeAssetPath);
+
             if (postAdjustments)
-                VolumeAdjustments(volumeAssetPath);
+                VolumeAdjustments(sourceVolume, destinationVolumeAssetPath);
 
             if (postBlur)
-                VolumeBlur(volumeAssetPath);
+                VolumeBlur(sourceVolume, destinationVolumeAssetPath);
         }
 
-        public void VolumeAdjustments(string volumeAssetPath)
+        public void VolumeAdjustments(Texture3D sourceVolume, string destinationVolumeAssetPath)
         {
-            Texture3D sourceVolume = AssetDatabase.LoadAssetAtPath<Texture3D>(volumeAssetPath);
-
             int compute_adjustments = adjustments.FindKernel("Adjustments");
 
             adjustments.SetFloat("Brightness", brightness);
@@ -92,15 +88,13 @@ namespace BakedVolumetrics
 
             //---------------------------------------- FINAL ----------------------------------------
             RenderTextureConverter renderTextureConverter = new RenderTextureConverter(slicer, renderTextureFormat, textureFormat);
-            renderTextureConverter.Save3D(volumeWrite, volumeAssetPath, new RenderTextureConverter.TextureObjectSettings() { anisoLevel = 0, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Repeat });
+            renderTextureConverter.Save3D(volumeWrite, destinationVolumeAssetPath, new RenderTextureConverter.TextureObjectSettings() { anisoLevel = 0, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Repeat });
 
             volumeWrite.Release();
         }
 
-        public void VolumeBlur(string volumeAssetPath)
+        public void VolumeBlur(Texture3D sourceVolume, string destinationVolumeAssetPath)
         {
-            Texture3D sourceVolume = AssetDatabase.LoadAssetAtPath<Texture3D>(volumeAssetPath);
-
             int compute_blur = gaussian3D.FindKernel("CSMain");
 
             gaussian3D.SetInt("BlurSamples", gaussianSamples);
@@ -144,7 +138,7 @@ namespace BakedVolumetrics
 
             //---------------------------------------- FINAL ----------------------------------------
             RenderTextureConverter renderTextureConverter = new RenderTextureConverter(slicer, renderTextureFormat, textureFormat);
-            renderTextureConverter.Save3D(volumeWriteZ, volumeAssetPath, new RenderTextureConverter.TextureObjectSettings() { anisoLevel = 0, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Repeat });
+            renderTextureConverter.Save3D(volumeWriteZ, destinationVolumeAssetPath, new RenderTextureConverter.TextureObjectSettings() { anisoLevel = 0, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Repeat });
 
             volumeWriteX.Release();
             volumeWriteY.Release();

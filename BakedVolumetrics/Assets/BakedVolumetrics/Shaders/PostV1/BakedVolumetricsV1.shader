@@ -14,7 +14,9 @@ Shader "Hidden/BakedVolumetricsV1"
 			#pragma fragmentoption ARB_precision_hint_fastest 
 			#include "Packages/com.unity.postprocessing/PostProcessing/Shaders/StdLib.hlsl"
 
-			#define _RaymarchSteps 64 //RTX 3080 STRESS TEST
+			//TODO: Make this adjustable
+			#define _RaymarchSteps 32
+			//#define AnimateNoise
 
 			TEXTURE2D_SAMPLER2D(_MainTex, sampler_MainTex);
 			TEXTURE2D_SAMPLER2D(_CameraDepthTexture, sampler_CameraDepthTexture);
@@ -120,7 +122,11 @@ Shader "Hidden/BakedVolumetricsV1"
 				float3 scaledCameraPos = ((cameraWorldPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
 
 				//compute jitter
-				float jitter = 1.0f + noise(uv.xy * 10000.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+				#if defined (AnimateNoise)
+					float jitter = 1.0f + noise(float2(uv.x + _Time.y, uv.y + _Time.y) * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+				#else
+					float jitter = 1.0f + noise(uv.xy * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+				#endif
 
 				//get our ray increment vector that we use so we can march into the scene. Jitter it also so we can mitigate banding/stepping artifacts
 				float3 raymarch_rayIncrement = normalize(i.worldDirection) / _RaymarchSteps;
@@ -177,7 +183,7 @@ Shader "Hidden/BakedVolumetricsV1"
 			ENDHLSL
         }
 
-		Pass //1 LOW RES DEPTH
+		Pass //1 Combine
 		{
 			HLSLPROGRAM
 			#pragma vertex Vert
@@ -186,77 +192,7 @@ Shader "Hidden/BakedVolumetricsV1"
 			#include "Packages/com.unity.postprocessing/PostProcessing/Shaders/StdLib.hlsl"
 
 			TEXTURE2D_SAMPLER2D(_MainTex, sampler_MainTex);
-			TEXTURE2D_SAMPLER2D(_CameraDepthTexture, sampler_CameraDepthTexture);
-			float _DownsampleFactor;
-
-			float4 _MainTex_TexelSize;
-
-			struct NewAttributesDefault
-			{
-				float3 vertex : POSITION;
-				float4 texcoord : TEXCOORD;
-			};
-
-			struct Varyings
-			{
-				float4 vertex : SV_POSITION;
-				float2 texcoord : TEXCOORD0;
-			};
-
-			Varyings Vert(NewAttributesDefault v)
-			{
-				Varyings o;
-				o.vertex = float4(v.vertex.xy, 0.0, 1.0);
-				o.texcoord = TransformTriangleVertexToUV(v.vertex.xy);
-
-#if UNITY_UV_STARTS_AT_TOP
-				o.texcoord = o.texcoord * float2(1.0, -1.0) + float2(0.0, 1.0);
-#endif
-
-				return o;
-			}
-
-			float GetDepth(float2 uv)
-			{
-				return SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, uv).r;
-			}
-
-			float4 Frag(Varyings i) : SV_Target
-			{
-				float2 uv = i.texcoord.xy;
-
-#if UNITY_UV_STARTS_AT_TOP
-				//uv.y = 1 - uv.y;
-#endif
-
-#if UNITY_SINGLE_PASS_STEREO
-				// If Single-Pass Stereo mode is active, transform the
-				// coordinates to get the correct output UV for the current eye.
-				float4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
-				uv = (uv - scaleOffset.zw) / scaleOffset.xy;
-#endif
-
-				float depth = GetDepth(uv);
-
-				return float4(depth, depth, depth, 1.0);
-			}
-
-			ENDHLSL
-		}
-
-		Pass //2 Combine
-		{
-			HLSLPROGRAM
-			#pragma vertex Vert
-			#pragma fragment Frag
-			#pragma fragmentoption ARB_precision_hint_fastest 
-			#include "Packages/com.unity.postprocessing/PostProcessing/Shaders/StdLib.hlsl"
-
-			TEXTURE2D_SAMPLER2D(_MainTex, sampler_MainTex);
-			TEXTURE2D_SAMPLER2D(_CameraDepthTexture, sampler_CameraDepthTexture);
 			sampler2D _FogColor;
-			sampler2D _LowResDepth;
-			float _DownsampleFactor;
 
 			float4 _MainTex_TexelSize;
 
@@ -283,11 +219,6 @@ Shader "Hidden/BakedVolumetricsV1"
 #endif
 
 				return o;
-			}
-
-			float GetDepth(float2 uv)
-			{
-				return SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, uv).r;
 			}
 
 			float4 Frag(Varyings i) : SV_Target
@@ -306,37 +237,7 @@ Shader "Hidden/BakedVolumetricsV1"
 #endif
 
 				float4 color = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
-				float4 fogColor = float4(0, 0, 0, 0);
-
-				float2 uvOffset = 1.0f / (_ScreenParams.xy / _DownsampleFactor);
-
-				//depth at the high res fragment
-				float d0 = GetDepth(uv);
-
-				//depth in the adjacent lower res pixels
-				float d1 = tex2Dlod(_LowResDepth, float4(uv.x, uv.y + uvOffset.y, 0, 0)).x; //up
-				float d2 = tex2Dlod(_LowResDepth, float4(uv.x, uv.y - uvOffset.y, 0, 0)).x; //down
-				float d3 = tex2Dlod(_LowResDepth, float4(uv.x + uvOffset.x, uv.y, 0, 0)).x; //right
-				float d4 = tex2Dlod(_LowResDepth, float4(uv.x - uvOffset.x, uv.y, 0, 0)).x; //left
-
-				//difference between the two values
-				d1 = abs(d0 - d1);
-				d2 = abs(d0 - d2);
-				d3 = abs(d0 - d3);
-				d4 = abs(d0 - d4);
-				float dmin = min(min(d1, d2), min(d3, d4));
-
-				//sampling the chosen fragment
-				if (dmin == d1) //up
-					fogColor = tex2Dlod(_FogColor, float4(uv.x, uv.y + uvOffset.y, 0, 0));
-				else if (dmin == d2) //down
-					fogColor = tex2Dlod(_FogColor, float4(uv.x, uv.y - uvOffset.y, 0, 0));
-				else if (dmin == d3) //right
-					fogColor = tex2Dlod(_FogColor, float4(uv.x + uvOffset.x, uv.y, 0, 0));
-				else if (dmin == d4) //left
-					fogColor = tex2Dlod(_FogColor, float4(uv.x - uvOffset.x, uv.y, 0, 0));
-				else
-					fogColor = tex2Dlod(_FogColor, float4(uv, 0, 0));
+				float4 fogColor = tex2Dlod(_FogColor, float4(uv, 0, 0));
 
 				//fogColor.a = clamp(fogColor.a, 0.0f, 1.0f);
 

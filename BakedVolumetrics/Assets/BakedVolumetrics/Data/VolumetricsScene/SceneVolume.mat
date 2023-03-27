@@ -32,6 +32,6 @@ Material:
     - _RaymarchStepSize: 50
     - _VolumeDensity: 1
     m_Colors:
-    - _VolumePos: {r: -5, g: 58, b: 1, a: 0}
+    - _VolumePos: {r: -5, g: 14.5, b: 1, a: 0}
     - _VolumeSize: {r: 92, g: 29, b: 62, a: 0}
   m_BuildTextureStacks: []
