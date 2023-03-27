@@ -38,11 +38,13 @@ Overview: This is basically lightmapping but for volumetric fog.
 
 ## How it works
 
-You define a box volume within your scene. You set the voxel density for ths volume *(or you can set a custom resolution)*, and choose to either sample colors from the scene light probes, or a custom raytracer, or both. Each have their advantages and drawbacks, but from there you use that to generate a 3D texture that is saved into the disk. At runtime, all we need to do is sample this 3D texture and raymarch through it against the scene depth buffer to get the desired effect. Very simple.
+To start you define a box volume within your scene, setting where its located, and it's bounds. You then resolution of the 3D texture by determining the size of the indivudal voxels, or you can set a custom resolution by hand. Next you can choose to either sample lighting from the scene light probes, or a custom raytracer, or both *(each have their advantages and drawbacks)*. After that there is an option to set the fog density of the volume *(constant, luminance, height based, etc.)* The next step is to generate a 3D texture that is saved into the disk. 
 
-There are 2 versions of this effect, one being a typical **Post Process**, the other is a **Scene Based solution** solution...
+For the shader, what we do is sample that 3D texture and perform a raymarch through it, checking it against the scene depth buffer. The ray terminates if: it intersects with the scene, is out of bounds, or if the density is too thick. The result is then lerped with the scene color buffer based on transmittance.
 
 ## Multiple Implementations
+
+There are 2 versions of this effect, two being a typical **Post Process** versions, and the other is a **Scene Based solution** solution...
 
 ### Post Processing V1
 This is the first implementation of the effect implemented as a post process. It does exactly as described in the **How it works** section.
