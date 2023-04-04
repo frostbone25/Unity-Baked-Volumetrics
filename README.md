@@ -67,7 +67,7 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 
 ### Advantages
 
-- Fast, because at runtime a 3D texture is sampled and raymarched against the scene depth buffer. No additional (sampling of lights and shadowmaps, etc.) are performed.
+- Simple and performant, at runtime a 3D texture is sampled and raymarched against the scene depth buffer. No additional steps are done (compared to other volumetric lighting solutions which have to sample of lights, shadowmaps, etc.).
 - The look of the volumetrics are generated purely offline. With the nature of it being offline you can apply alot more computation and processing to sample things like indirect lighting which completely transforms the look of the fog.
 
 ### Drawbacks
