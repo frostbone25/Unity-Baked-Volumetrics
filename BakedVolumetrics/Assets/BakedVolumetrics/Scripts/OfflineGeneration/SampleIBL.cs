@@ -151,7 +151,7 @@ namespace BakedVolumetrics
             IBLCamera.transform.Rotate(180, 0, 0);
             IBLCamera.Render();
             IBLCompute.Dispatch(IBLComputeKernel, dispatchX, dispatchY, 1);
-            IBLComputeProxy = RTConverter.ConvertFromRenderTexture2D(IBLComputeResult, textureFormat, true);
+            IBLComputeProxy = RenderTextureConverter.ConvertFromRenderTexture2D(IBLComputeResult, textureFormat, true);
 
             //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||

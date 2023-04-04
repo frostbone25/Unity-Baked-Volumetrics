@@ -71,7 +71,7 @@ MonoBehaviour:
     value: 0
   postExposure:
     overrideState: 1
-    value: 1
+    value: 0
   contrast:
     overrideState: 0
     value: 0
@@ -1323,14 +1323,52 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f75252d0cbb0f3c4fb7fffd2942fdd6a, type: 3}
   m_Name: BakedVolumetricsV1
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   enabled:
     overrideState: 1
     value: 1
+  jitter:
+    overrideState: 1
+    value: {fileID: 2800000, guid: b279cbca442fec5409163a21328c9e35, type: 2}
+    defaultState: 1
+  density:
+    overrideState: 1
+    value: 1
+  stepSize:
+    overrideState: 1
+    value: 63.6
+  jitterStrength:
+    overrideState: 1
+    value: 2
   volume:
     overrideState: 1
     value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
     defaultState: 1
+  volumeResolution:
+    overrideState: 1
+    value: {x: 92, y: 29, z: 62}
+  volumePosition:
+    overrideState: 1
+    value: {x: -5, y: 14.5, z: 1}
+  volumeSize:
+    overrideState: 1
+    value: {x: 92, y: 29, z: 62}
+--- !u!114 &-5446852267329444448
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd2a5ca62ca0edb4a897b5b51a91b10c, type: 3}
+  m_Name: BakedVolumetricsV3
+  m_EditorClassIdentifier: 
+  active: 0
+  enabled:
+    overrideState: 1
+    value: 1
   jitter:
     overrideState: 1
     value: {fileID: 2800000, guid: b279cbca442fec5409163a21328c9e35, type: 2}
@@ -1344,15 +1382,21 @@ MonoBehaviour:
   jitterStrength:
     overrideState: 1
     value: 2
-  volumeResolution:
+  volumes:
     overrideState: 1
-    value: {x: 92, y: 29, z: 62}
-  volumePosition:
-    overrideState: 1
-    value: {x: -5, y: 14.5, z: 1}
-  volumeSize:
-    overrideState: 1
-    value: {x: 92, y: 29, z: 62}
+    value:
+    - volume: {fileID: 11700000, guid: cdfc52aca180bf24d89ba84c1ccd3cb6, type: 2}
+      volumeResolution: {x: 92, y: 29, z: 62}
+      volumePosition: {x: -5, y: 14.5, z: 1}
+      volumeSize: {x: 92, y: 29, z: 62}
+    - volume: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
+      volumeResolution: {x: 92, y: 29, z: 62}
+      volumePosition: {x: -5, y: 14.5, z: 1}
+      volumeSize: {x: 92, y: 29, z: 62}
+    - volume: {fileID: 11700000, guid: d53ee49307760a1468a8de8a2777333c, type: 2}
+      volumeResolution: {x: 92, y: 29, z: 62}
+      volumePosition: {x: -5, y: 14.5, z: 1}
+      volumeSize: {x: 92, y: 29, z: 62}
 --- !u!114 &-3590662874747151992
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1369,10 +1413,6 @@ MonoBehaviour:
   enabled:
     overrideState: 1
     value: 1
-  volume:
-    overrideState: 1
-    value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
-    defaultState: 1
   jitter:
     overrideState: 1
     value: {fileID: 2800000, guid: b279cbca442fec5409163a21328c9e35, type: 2}
@@ -1386,6 +1426,10 @@ MonoBehaviour:
   jitterStrength:
     overrideState: 1
     value: 2
+  volume:
+    overrideState: 1
+    value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
+    defaultState: 1
   volumeResolution:
     overrideState: 1
     value: {x: 92, y: 29, z: 62}
@@ -1411,3 +1455,4 @@ MonoBehaviour:
   - {fileID: -7693575959006385970}
   - {fileID: -6904380953964002115}
   - {fileID: -3590662874747151992}
+  - {fileID: -5446852267329444448}

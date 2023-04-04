@@ -5,7 +5,6 @@ using UnityEngine.Rendering;
 using UnityEngine;
 using UnityEditor;
 using System.IO;
-using UnityEditor.XR.Management;
 
 namespace BakedVolumetrics
 {
@@ -72,6 +71,26 @@ namespace BakedVolumetrics
         {
             //create our texture2D object to store the slice
             Texture2D output = new Texture2D(rt.width, rt.height, assetFormat, false);
+
+            //make sure the render texture slice is active so we can read from it
+            RenderTexture.active = rt;
+
+            //read the texture and store the data in the texture2D object
+            output.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            output.Apply();
+
+            return output;
+        }
+
+        /// <summary>
+        /// Converts a 2D render texture to a Texture2D object.
+        /// </summary>
+        /// <param name="rt"></param>
+        /// <returns></returns>
+        public static Texture2D ConvertFromRenderTexture2D(RenderTexture rt, TextureFormat assetFormat, bool mipChain = false)
+        {
+            //create our texture2D object to store the slice
+            Texture2D output = new Texture2D(rt.width, rt.height, assetFormat, mipChain);
 
             //make sure the render texture slice is active so we can read from it
             RenderTexture.active = rt;

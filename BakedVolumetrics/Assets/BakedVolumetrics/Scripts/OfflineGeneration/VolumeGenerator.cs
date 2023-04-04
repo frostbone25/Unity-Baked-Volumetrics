@@ -293,10 +293,11 @@ namespace BakedVolumetrics
 
         public void GenerateVolume(int mode)
         {
-            double timeBeforeBake = Time.realtimeSinceStartupAsDouble;
+            //double timeBeforeBake = Time.realtimeSinceStartupAsDouble;
+            double timeBeforeBake = Time.realtimeSinceStartup;
 
             //generate volume (and generate volume with post effects)
-            if(mode == 0 || mode == 1)
+            if (mode == 0 || mode == 1)
             {
                 UpdateProgressBar("Setting up and creating 3d texture...", 0.25f);
 
@@ -367,7 +368,8 @@ namespace BakedVolumetrics
                 UpdateMaterial();
             }
 
-            double timeAfterBake = Time.realtimeSinceStartupAsDouble - timeBeforeBake;
+            //double timeAfterBake = Time.realtimeSinceStartupAsDouble - timeBeforeBake;
+            double timeAfterBake = Time.realtimeSinceStartup - timeBeforeBake;
             Debug.Log(string.Format("'{0}' took {1} seconds to bake.", volumeName, timeAfterBake));
         }
 
@@ -445,6 +447,9 @@ namespace BakedVolumetrics
                 //try loading one at the path
                 fogMaterial = AssetDatabase.LoadAssetAtPath<Material>(volumeMaterialPath);
             }
+
+            if (fogMaterial == null)
+                return;
 
             switch (raymarchSamples)
             {
