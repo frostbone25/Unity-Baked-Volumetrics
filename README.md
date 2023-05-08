@@ -91,3 +91,9 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 - **OFFLINE VOLUME GENERATION:** Save the raw sample results, so that if the user wishes to apply post adjustments they can do so without needing to resample the scene again which can take a long time.
 - **EDITOR:** Previewing Voxels is really really slow at low density values, need to come up with a different way to preview the different voxels.
 - **EDITOR:** Add a context menu item in the scene hiearchy to create a volume.
+
+### Credits
+
+- **[orels1](https://github.com/orels1)**: Improved VRC support.
+- **[s-ilent](https://github.com/s-ilent)**: Improved noise and using bluenoise instead on their [fork of this repo](https://github.com/s-ilent/Unity-Baked-Volumetrics).
+- **[Christoph Peters](http://momentsingraphics.de/BlueNoise.html)**: Free blue noise textures.
