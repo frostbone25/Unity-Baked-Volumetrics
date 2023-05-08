@@ -14,8 +14,13 @@ namespace BakedVolumetrics
 {
     public class VolumeGenerator : MonoBehaviour
     {
-        //public
-        public string volumeName { get { return gameObject.name; } }
+        public string volumeName 
+        { 
+            get 
+            { 
+                return gameObject.name; 
+            } 
+        }
 
         public LightingSource lightingSource = LightingSource.LightProbes;
         public CombineColorType combineColorType = CombineColorType.Additive;
@@ -35,14 +40,13 @@ namespace BakedVolumetrics
         public bool previewDensityHeight = true;
         public bool previewVoxels = false;
 
-        public int jitterResolution = 64;
-
         public DensityType densityType = DensityType.Constant;
         public float densityConstant = 1.0f;
         public float densityTop = 0.0f;
         public float densityBottom = 1.0f;
         public float densityHeight = 0.0f;
         public float densityHeightFallof = 1.0f;
+        public bool densityInvertLuminance = false;
 
         public SampleLightprobe sampleLightprobe;
         public SampleVoxelRaytrace sampleVoxelRaytrace;
@@ -251,9 +255,9 @@ namespace BakedVolumetrics
             }
             */
 
-                //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-                //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-                //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
             float alphaResult = 1.0f;
 
             if (densityType == DensityType.Constant)
@@ -265,7 +269,7 @@ namespace BakedVolumetrics
                 Vector3 luminance = GetLuminance();
                 Vector3 colorAsVector = new Vector3(colorResult.r, colorResult.g, colorResult.b);
 
-                alphaResult = Vector3.Dot(colorAsVector, luminance);
+                alphaResult = densityInvertLuminance ? 1 - Vector3.Dot(colorAsVector, luminance) : Vector3.Dot(colorAsVector, luminance);
             }
             else if(densityType == DensityType.HeightBased)
             {
@@ -277,7 +281,7 @@ namespace BakedVolumetrics
                 Vector3 luminance = GetLuminance();
                 Vector3 colorAsVector = new Vector3(colorResult.r, colorResult.g, colorResult.b);
 
-                float lumaResult = Vector3.Dot(colorAsVector, luminance);
+                float lumaResult = densityInvertLuminance ? 1 - Vector3.Dot(colorAsVector, luminance) : Vector3.Dot(colorAsVector, luminance);
                 float lerpFactor = Mathf.Clamp((probePosition.y - densityHeight) / densityHeightFallof, 0.0f, 1.0f);
                 alphaResult = Mathf.Lerp(lumaResult * densityBottom, lumaResult * densityTop, lerpFactor);
             }
@@ -429,7 +433,7 @@ namespace BakedVolumetrics
             string volumeAssetPath = sceneVolumetricsFolder + "/" + volumeAssetName;
             fogMaterial.SetTexture("_VolumeTexture", AssetDatabase.LoadAssetAtPath<Texture3D>(volumeAssetPath));
 
-            fogMaterial.SetTexture("_JitterTexture", GetJitter());
+            fogMaterial.SetTexture("_JitterTexture", NoiseLibrary.GetBlueNoise());
 
             fogSceneObject.transform.localScale = Vector3.one * volumeSize.magnitude * 1.5f;
         }
@@ -573,42 +577,6 @@ namespace BakedVolumetrics
                 default:
                     return RenderTextureFormat.ARGBHalf;
             }
-        }
-
-        private Texture2D GetJitter()
-        {
-            if (AssetDatabase.IsValidFolder("Assets/BakedVolumetrics/Data") == false)
-                AssetDatabase.CreateFolder("Assets/BakedVolumetrics", "Data");
-
-            string sharedVolumetricsFolder = "Assets/BakedVolumetrics/Data/Shared";
-
-            if (AssetDatabase.IsValidFolder(sharedVolumetricsFolder) == false)
-                AssetDatabase.CreateFolder("Assets/BakedVolumetrics/Data", "Shared");
-
-            string jitterAssetName = "Jitter.asset";
-            string jitterAssetPath = sharedVolumetricsFolder + "/" + jitterAssetName;
-
-            Texture2D jitter = AssetDatabase.LoadAssetAtPath<Texture2D>(jitterAssetPath);
-
-            if (jitter == null)
-            {
-                jitter = new Texture2D(jitterResolution, jitterResolution, TextureFormat.RGBA4444, false);
-                jitter.filterMode = FilterMode.Bilinear;
-                jitter.anisoLevel = 0;
-
-                for (int x = 0; x < jitterResolution; x++)
-                {
-                    for (int y = 0; y < jitterResolution; y++)
-                    {
-                        Color randomColor = new Color(UnityEngine.Random.Range(0.0f, 1.0f), 0.0f, 0.0f, 1.0f);
-                        jitter.SetPixel(x, y, randomColor);
-                    }
-                }
-
-                AssetDatabase.CreateAsset(jitter, jitterAssetPath);
-            }
-
-            return jitter;
         }
 
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| GIZMOS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||

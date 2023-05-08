@@ -33,6 +33,7 @@ namespace BakedVolumetrics
         SerializedProperty densityConstant;
         SerializedProperty densityTop;
         SerializedProperty densityBottom;
+        SerializedProperty densityInvertLuminance;
 
         VolumeGenerator scriptObject;
 
@@ -58,6 +59,7 @@ namespace BakedVolumetrics
             densityConstant = serializedObject.FindProperty("densityConstant");
             densityTop = serializedObject.FindProperty("densityTop");
             densityBottom = serializedObject.FindProperty("densityBottom");
+            densityInvertLuminance = serializedObject.FindProperty("densityInvertLuminance");
         }
 
         public override void OnInspectorGUI()
@@ -107,25 +109,10 @@ namespace BakedVolumetrics
             EditorGUILayout.PropertyField(raymarchSamples);
             EditorGUILayout.PropertyField(lightingSource);
 
-            /*
-            if(lightingSourceValue == LightingSource.Combined)
+            if(lightingSourceValue == LightingSource.LightProbes)
             {
-                EditorGUILayout.PropertyField(combineColorType);
-                CombineColorType combineColorTypeValue = (CombineColorType)combineColorType.intValue;
-
-                EditorGUILayout.LabelField("Combine Lighting Sources Options", EditorStyles.whiteLargeLabel);
-
-                if (combineColorTypeValue == CombineColorType.Additive)
-                {
-                    EditorGUILayout.PropertyField(additiveLightprobeIntensity);
-                    EditorGUILayout.PropertyField(additiveRaytracedIntensity);
-                }
-                else if (combineColorTypeValue == CombineColorType.Lerp)
-                {
-                    lerpFactor.floatValue = EditorGUILayout.Slider("Lerp Factor", lerpFactor.floatValue, 0.0f, 1.0f);
-                }
+                EditorGUILayout.LabelField("NOTE: The resolution of the final bake is dependent on how dense your light probe groups are. If your probe groups are sparse populated but you're generating at a high resolution volume then you won't get any sharper results and will just be wasting memory/vram/disk space. If you want sharper results consider using a different lighting source.", EditorStyles.helpBox);
             }
-            */
 
             //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
@@ -147,6 +134,15 @@ namespace BakedVolumetrics
 
                 EditorGUILayout.PropertyField(densityHeight);
                 EditorGUILayout.PropertyField(densityHeightFallof);
+            }
+
+            if (densityTypeValue == DensityType.Luminance)
+            {
+                EditorGUILayout.PropertyField(densityInvertLuminance);
+            }
+            else if(densityTypeValue == DensityType.HeightBasedLuminance)
+            {
+                EditorGUILayout.PropertyField(densityInvertLuminance);
             }
 
             //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||

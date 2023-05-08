@@ -1323,7 +1323,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f75252d0cbb0f3c4fb7fffd2942fdd6a, type: 3}
   m_Name: BakedVolumetricsV1
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   enabled:
     overrideState: 1
     value: 1
@@ -1342,7 +1342,7 @@ MonoBehaviour:
     value: 2
   volume:
     overrideState: 1
-    value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
+    value: {fileID: 0}
     defaultState: 1
   volumeResolution:
     overrideState: 1
@@ -1385,11 +1385,11 @@ MonoBehaviour:
   volumes:
     overrideState: 1
     value:
-    - volume: {fileID: 11700000, guid: cdfc52aca180bf24d89ba84c1ccd3cb6, type: 2}
+    - volume: {fileID: 0}
       volumeResolution: {x: 92, y: 29, z: 62}
       volumePosition: {x: -5, y: 14.5, z: 1}
       volumeSize: {x: 92, y: 29, z: 62}
-    - volume: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
+    - volume: {fileID: 0}
       volumeResolution: {x: 92, y: 29, z: 62}
       volumePosition: {x: -5, y: 14.5, z: 1}
       volumeSize: {x: 92, y: 29, z: 62}
@@ -1428,7 +1428,7 @@ MonoBehaviour:
     value: 2
   volume:
     overrideState: 1
-    value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
+    value: {fileID: 0}
     defaultState: 1
   volumeResolution:
     overrideState: 1

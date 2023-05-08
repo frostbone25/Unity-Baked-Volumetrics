@@ -16,7 +16,7 @@ Shader "Hidden/BakedVolumetricsV1"
 
 			//TODO: Make this adjustable
 			#define _RaymarchSteps 32
-			//#define AnimateNoise
+			//#define _ANIMATED_NOISE
 
 			TEXTURE2D_SAMPLER2D(_MainTex, sampler_MainTex);
 			TEXTURE2D_SAMPLER2D(_CameraDepthTexture, sampler_CameraDepthTexture);
@@ -28,6 +28,7 @@ Shader "Hidden/BakedVolumetricsV1"
 			float4x4 _ViewProjInv;
 
 			float4 _MainTex_TexelSize;
+			float4 _JitterTexture_TexelSize;
 			float4 _VolumePos;
 			float4 _VolumeSize;
 
@@ -48,11 +49,34 @@ Shader "Hidden/BakedVolumetricsV1"
 				float4 worldDirection : TEXCOORD1;
 			};
 
-			//sample a noise texture instead of calculating one (should save on resources)
-			float noise(float2 p)
+#if defined (_ANIMATED_NOISE)
+			//animated noise courtesy of silent
+			float r2sequence(float2 pixel)
 			{
-				return tex2Dlod(_JitterTexture, float4(p, 0, 0)).r;
+				const float a1 = 0.75487766624669276;
+				const float a2 = 0.569840290998;
+
+				return frac(a1 * float(pixel.x) + a2 * float(pixel.y));
 			}
+
+			float2 r2_modified(float idx, float2 seed)
+			{
+				return frac(seed + float(idx) * float2(0.245122333753, 0.430159709002));
+			}
+
+			float noise(float2 uv)
+			{
+				uv += r2_modified(_Time.y, uv);
+				uv *= _ScreenParams.xy * _JitterTexture_TexelSize.xy;
+
+				return tex2Dlod(_JitterTexture, float4(uv, 0, 0));
+			}
+#else
+			float noise(float2 uv)
+			{
+				return tex2Dlod(_JitterTexture, float4(uv * _ScreenParams.xy * _JitterTexture_TexelSize.xy, 0, 0));
+			}
+#endif
 
 			float GetDepth(float2 uv)
 			{
@@ -121,12 +145,11 @@ Shader "Hidden/BakedVolumetricsV1"
 				float3 scaledWorldPos = ((worldPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
 				float3 scaledCameraPos = ((cameraWorldPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
 
+				// UV offset by orientation
+				float3 localViewDir = normalize(_WorldSpaceCameraPos.xyz - worldPos.xyz);
+
 				//compute jitter
-				#if defined (AnimateNoise)
-					float jitter = 1.0f + noise(float2(uv.x + _Time.y, uv.y + _Time.y) * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
-				#else
-					float jitter = 1.0f + noise(uv.xy * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
-				#endif
+				float jitter = 1.0f + noise(uv.xy + length(localViewDir)) * _RaymarchStepSize * _RaymarchJitterStrength;
 
 				//get our ray increment vector that we use so we can march into the scene. Jitter it also so we can mitigate banding/stepping artifacts
 				float3 raymarch_rayIncrement = normalize(i.worldDirection) / _RaymarchSteps;

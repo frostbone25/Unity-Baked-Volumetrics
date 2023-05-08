@@ -28,16 +28,16 @@ namespace BakedVolumetrics
         public bool limitByRange = false;
         public bool indoorOnlySamples = false;
 
-        public bool doOcclusion;
-        public bool occlusionPreventLeaks;
+        public bool doOcclusion = true;
+        public bool occlusionPreventLeaks = false;
         public float occlusionLeakFactor = 1.0f;
 
-        public bool includeBakedLights;
-        public bool includeMixedLights;
-        public bool includeRealtimeLights;
-        public bool includeDirectionalLights;
-        public bool includePointLights;
-        public bool includeSpotLights;
+        public bool includeBakedLights = true;
+        public bool includeMixedLights = true;
+        public bool includeRealtimeLights = false;
+        public bool includeDirectionalLights = true;
+        public bool includePointLights = true;
+        public bool includeSpotLights = true;
 
         //directional light settings
         public float directionalLightsMultiplier = 1.0f;
@@ -180,20 +180,20 @@ namespace BakedVolumetrics
                     bool type_case2 = currentLight.type == LightType.Point && includePointLights;
                     bool type_case3 = currentLight.type == LightType.Spot && includeSpotLights;
 
-                        if (type_case1) //directional lights
-                        {
-                            bool world_occlusion_test = doOcclusion ? Physics.Raycast(probePosition, -currentLight.transform.forward, float.MaxValue) == false : true;
-                            colorResult += SampleDirectionalLight(currentLight, probePosition, world_occlusion_test);
-                        }
-                        else
-                        {
-                            bool local_occlusion_test = doOcclusion ? Physics.Raycast(lightPosition, targetDirection, currentDistance) == false : true;
+                    if (type_case1) //directional lights
+                    {
+                        bool world_occlusion_test = doOcclusion ? Physics.Raycast(probePosition, -currentLight.transform.forward, float.MaxValue) == false : true;
+                        colorResult += SampleDirectionalLight(currentLight, probePosition, world_occlusion_test);
+                    }
+                    else
+                    {
+                        bool local_occlusion_test = doOcclusion ? Physics.Raycast(lightPosition, targetDirection, currentDistance) == false : true;
 
-                            if (type_case2) //point lights
-                                colorResult += SamplePointLight(currentLight, probePosition, local_occlusion_test);
-                            else if (type_case3) //spot lights
-                                colorResult += SampleSpotLight(currentLight, probePosition, local_occlusion_test);
-                        }
+                        if (type_case2) //point lights
+                            colorResult += SamplePointLight(currentLight, probePosition, local_occlusion_test);
+                        else if (type_case3) //spot lights
+                            colorResult += SampleSpotLight(currentLight, probePosition, local_occlusion_test);
+                    }
                 }
             }
 
@@ -209,11 +209,11 @@ namespace BakedVolumetrics
             switch (raytracedAttenuationType)
             {
                 case AttenuationType.Linear:
-                    return 1.0f / distance;
+                    return (1.0f / distance) * Mathf.PI;
                 case AttenuationType.InverseSquare:
-                    return 1.0f / (distance * distance);
+                    return (1.0f / (distance * distance)) * Mathf.PI;
                 default:
-                    return 1.0f / distance;
+                    return (1.0f / distance) * Mathf.PI;
             }
         }
     }

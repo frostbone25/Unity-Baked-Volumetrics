@@ -13,6 +13,7 @@
         [Header(Jitter)]
         _JitterTexture("Jitter Texture", 2D) = "white" {}
         _RaymarchJitterStrength("Raymarch Jitter", Float) = 2
+        [Toggle(_ANIMATED_NOISE)] _EnableAnimatedJitter("Animated Noise", Float) = 1
     }
 
     SubShader
@@ -32,29 +33,27 @@
             #pragma fragment frag
             #pragma multi_compile_instancing  
             #pragma multi_compile SAMPLES_8 SAMPLES_16 SAMPLES_24 SAMPLES_32 SAMPLES_48 SAMPLES_64 SAMPLES_128
+            #pragma shader_feature_local _ANIMATED_NOISE
             #include "UnityCG.cginc"
 
-            //#define AnimateNoise
-
-#ifdef SAMPLES_8
-#define _RaymarchSteps 8
-#elif SAMPLES_16
-#define _RaymarchSteps 16
-#elif SAMPLES_24
-#define _RaymarchSteps 24
-#elif SAMPLES_32
-#define _RaymarchSteps 32
-#elif SAMPLES_48
-#define _RaymarchSteps 48
-#elif SAMPLES_64
-#define _RaymarchSteps 64
-#elif SAMPLES_128
-#define _RaymarchSteps 128
-#else
-#define _RaymarchSteps 32
-#endif
-
-//#define _RaymarchSteps 16384 //RTX 3080 STRESS TEST
+            #ifdef SAMPLES_8
+                #define _RaymarchSteps 8
+            #elif SAMPLES_16
+                #define _RaymarchSteps 16
+            #elif SAMPLES_24
+                #define _RaymarchSteps 24
+            #elif SAMPLES_32
+                #define _RaymarchSteps 32
+            #elif SAMPLES_48
+                #define _RaymarchSteps 48
+            #elif SAMPLES_64
+                #define _RaymarchSteps 64
+            #elif SAMPLES_128
+                #define _RaymarchSteps 128
+            #else
+                #define _RaymarchSteps 32
+                //#define _RaymarchSteps 16384 //RTX 3080 STRESS TEST
+            #endif
 
             struct appdata
             {
@@ -82,17 +81,41 @@
             fixed _RaymarchStepSize;
 
             sampler2D_half _JitterTexture;
+            fixed4 _JitterTexture_TexelSize;
             fixed _RaymarchJitterStrength;
 
             UNITY_DECLARE_SCREENSPACE_TEXTURE(_CameraDepthTexture);
             //sampler2D_float _CameraDepthTexture;
             fixed4 _CameraDepthTexture_TexelSize;
 
-            //sample a noise texture instead of calculating one (should save on resources)
-            fixed noise(fixed2 p)
+#if defined (_ANIMATED_NOISE)
+            //animated noise courtesy of silent
+            float r2sequence(float2 pixel) 
             {
-                return tex2Dlod(_JitterTexture, fixed4(p, 0, 0)).r;
+                const float a1 = 0.75487766624669276;
+                const float a2 = 0.569840290998;
+
+                return frac(a1 * float(pixel.x) + a2 * float(pixel.y));
             }
+
+            float2 r2_modified(float idx, float2 seed)
+            {
+                return frac(seed + float(idx) * float2(0.245122333753, 0.430159709002));
+            }
+
+            fixed noise(fixed2 uv)
+            {
+                uv += r2_modified(_Time.y, uv);
+                uv *= _ScreenParams.xy * _JitterTexture_TexelSize.xy;
+
+                return tex2Dlod(_JitterTexture, fixed4(uv, 0, 0));
+            }
+#else
+            fixed noise(fixed2 uv)
+            {
+                return tex2Dlod(_JitterTexture, fixed4(uv * _ScreenParams.xy * _JitterTexture_TexelSize.xy, 0, 0));
+            }
+#endif
 
             v2f vert(appdata v)
             {
@@ -122,14 +145,16 @@
 
 
 #if UNITY_UV_STARTS_AT_TOP
-                if (_CameraDepthTexture_TexelSize.y < 0) 
+                if (_CameraDepthTexture_TexelSize.y < 0)
+                {
                     screenUV.y = 1 - screenUV.y;
+                }
 #endif
 
 #if UNITY_SINGLE_PASS_STEREO
                 // If Single-Pass Stereo mode is active, transform the
                 // coordinates to get the correct output UV for the current eye.
-                float4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
+                fixed4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
                 screenUV = (screenUV - scaleOffset.zw) / scaleOffset.xy;
 #endif
 
@@ -146,12 +171,13 @@
                 fixed3 scaledWorldPos = ((worldPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
                 fixed3 scaledCameraPos = ((_WorldSpaceCameraPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
 
+                // UV offset by orientation
+                fixed3 localViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
+
                 //compute jitter
-                #if defined (AnimateNoise)
-                fixed jitter = 1.0f + noise(fixed2(screenUV.x + _Time.y, screenUV.y + _Time.y) * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
-                #else
-                fixed jitter = 1.0f + noise(screenUV.xy * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
-                #endif
+                //fixed jitter = 1.0f + noise(screenUV.xy * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+                fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * _RaymarchJitterStrength;
+                //fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * ((_RaymarchStepSize / _RaymarchSteps));
 
                 //get our ray increment vector that we use so we can march into the scene. Jitter it also so we can mitigate banding/stepping artifacts
                 fixed3 raymarch_rayIncrement = normalize(i.camRelativeWorldPos.xyz) / _RaymarchSteps;
