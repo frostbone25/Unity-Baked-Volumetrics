@@ -86,7 +86,8 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 - **POST PROCESSING:** Use interleaved rendering.
 - **POST PROCESSING:** Use temporal filtering in-conjunction with animated noise to accumulate samples over multiple frames.
 - **POST PROCESSING:** Using a froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
-- **OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading.
+- **OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading (using the unity jobs system).
+- **OFFLINE VOLUME GENERATION:** With improved cpu raytraced performance, calculations for doing bounce lighting.
 - **OFFLINE VOLUME GENERATION:** Create a custom pathtraced/raytraced solution that voxelizes the scene within the volume and traces against it rather than relying on scene light probes which can be low quality and dependent on user placement (Could also be potentially faster than the current CPU only implemntation of the raytracer?).
 - **OFFLINE VOLUME GENERATION:** Save the raw sample results, so that if the user wishes to apply post adjustments they can do so without needing to resample the scene again which can take a long time.
 - **EDITOR:** Previewing Voxels is really really slow at low density values, need to come up with a different way to preview the different voxels.
