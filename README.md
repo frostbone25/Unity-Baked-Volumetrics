@@ -81,7 +81,6 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 
 ## Future Plans/Ideas
 
-- **GENERAL:** Look for ways to interpolate between samples to reduce noise.
 - **POST PROCESSING:** Use interleaved rendering.
 - **POST PROCESSING:** Use temporal filtering in-conjunction with animated noise to accumulate samples over multiple frames.
 - **POST PROCESSING:** Using a froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
@@ -95,5 +94,5 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 ### Credits
 
 - **[orels1](https://github.com/orels1)**: Improved VRC support.
-- **[s-ilent](https://github.com/s-ilent)**: Improved noise and using bluenoise instead on their [fork of this repo](https://github.com/s-ilent/Unity-Baked-Volumetrics).
+- **[s-ilent](https://github.com/s-ilent)**: Improved noise by utilizing bluenoise on their [fork of this repo](https://github.com/s-ilent/Unity-Baked-Volumetrics).
 - **[Christoph Peters](http://momentsingraphics.de/BlueNoise.html)**: Free blue noise textures.
