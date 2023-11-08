@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.InteropServices.ComTypes;
+using Unity.Mathematics;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -34,8 +35,6 @@ namespace BakedVolumetrics
         [Header("Bakes")]
         public bool bakeAlbedo = true;
         public bool bakeEmissive = true;
-        public bool bakeNormal = false;
-        public bool bakePosition = false;
 
         [Header("Gizmos")]
         public bool previewBounds = true;
@@ -58,13 +57,9 @@ namespace BakedVolumetrics
         private ComputeShader voxelize;
         private Shader cameraVoxelAlbedoShader;
         private Shader cameraVoxelEmissiveShader;
-        private Shader cameraVoxelNormalShader;
-        private Shader cameraVoxelPositionShader;
 
         private Texture3D voxelAlbedoBuffer;
         private Texture3D voxelEmissiveBuffer;
-        private Texture3D voxelNormalBuffer;
-        private Texture3D voxelPositionBuffer;
 
         private static TextureFormat textureformat = TextureFormat.RGBAHalf;
         private static RenderTextureFormat rendertextureformat = RenderTextureFormat.ARGBHalf;
@@ -76,8 +71,6 @@ namespace BakedVolumetrics
 
             if (cameraVoxelAlbedoShader == null) cameraVoxelAlbedoShader = Shader.Find("Hidden/CameraVoxelAlbedo");
             if (cameraVoxelEmissiveShader == null) cameraVoxelEmissiveShader = Shader.Find("Hidden/CameraVoxelEmissive");
-            if (cameraVoxelNormalShader == null) cameraVoxelNormalShader = Shader.Find("Hidden/CameraVoxelNormal");
-            if (cameraVoxelPositionShader == null) cameraVoxelPositionShader = Shader.Find("Hidden/CameraVoxelPosition");
         }
 
         private void GetVoxelBuffers()
@@ -87,13 +80,9 @@ namespace BakedVolumetrics
             string sceneVolumetricsFolder = "Assets/BakedVolumetrics/Data/" + sceneName;
             string voxelAssetPath_albedo = sceneVolumetricsFolder + "/" + string.Format("{0}_albedo.asset", voxelName);
             string voxelAssetPath_emissive = sceneVolumetricsFolder + "/" + string.Format("{0}_emissive.asset", voxelName);
-            string voxelAssetPath_normal = sceneVolumetricsFolder + "/" + string.Format("{0}_normal.asset", voxelName);
-            string voxelAssetPath_position = sceneVolumetricsFolder + "/" + string.Format("{0}_position.asset", voxelName);
 
             voxelAlbedoBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_albedo);
             voxelEmissiveBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_emissive);
-            voxelNormalBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_normal);
-            voxelPositionBuffer = AssetDatabase.LoadAssetAtPath<Texture3D>(voxelAssetPath_position);
         }
 
         private void SetupVoxelCamera()
@@ -188,53 +177,22 @@ namespace BakedVolumetrics
             {
                 if(sceneLight.type == LightType.Directional)
                 {
-                    VoxelLightDirectional voxelLightDirectional = new VoxelLightDirectional()
-                    {
-                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
-                        lightDirection = sceneLight.transform.forward,
-                        lightIntensity = sceneLight.intensity,
-                    };
-
+                    VoxelLightDirectional voxelLightDirectional = new VoxelLightDirectional(sceneLight);
                     voxelLightDirectionals.Add(voxelLightDirectional);
                 }
                 else if(sceneLight.type == LightType.Point)
                 {
-                    VoxelLightPoint voxelLightPoint = new VoxelLightPoint()
-                    {
-                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
-                        lightIntensity = sceneLight.intensity,
-                        lightPosition = sceneLight.transform.position,
-                        lightRange = sceneLight.range,
-                    };
-
+                    VoxelLightPoint voxelLightPoint = new VoxelLightPoint(sceneLight);
                     voxelLightPoints.Add(voxelLightPoint);
                 }
                 else if(sceneLight.type == LightType.Spot)
                 {
-                    VoxelLightSpot voxelLightSpot = new VoxelLightSpot()
-                    {
-                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
-                        lightIntensity = sceneLight.intensity,
-                        lightPosition = sceneLight.transform.position,
-                        lightDirection = sceneLight.transform.forward,
-                        lightRange = sceneLight.range,
-                        lightAngle = sceneLight.spotAngle,
-                    };
-
+                    VoxelLightSpot voxelLightSpot = new VoxelLightSpot(sceneLight);
                     voxelLightSpots.Add(voxelLightSpot);
                 }
                 else if(sceneLight.type == LightType.Area)
                 {
-                    VoxelLightArea voxelLightArea = new VoxelLightArea()
-                    {
-                        lightColor = new Vector3(sceneLight.color.r, sceneLight.color.g, sceneLight.color.b),
-                        lightIntensity = sceneLight.intensity,
-                        lightDirection = sceneLight.transform.forward,
-                        lightPosition = sceneLight.transform.position,
-                        lightRange = sceneLight.range,
-                        lightSize = sceneLight.areaSize,
-                    };
-
+                    VoxelLightArea voxelLightArea = new VoxelLightArea(sceneLight);
                     voxelLightAreas.Add(voxelLightArea);
                 }
             }
@@ -284,7 +242,12 @@ namespace BakedVolumetrics
 
             voxelize.SetVector("VolumeResolution", new Vector4(voxelResolution.x, voxelResolution.y, voxelResolution.z, 0));
 
-            if(directionalLightsBuffer != null) voxelize.SetBuffer(compute_main, "DirectionalLights", directionalLightsBuffer);
+            voxelize.SetBool("DirectionalLightsExist", directionalLightsBuffer != null);
+            voxelize.SetBool("PointLightsExist", pointLightsBuffer != null);
+            voxelize.SetBool("SpotLightsExist", spotLightsBuffer != null);
+            voxelize.SetBool("AreaLightsExist", areaLightsBuffer != null);
+
+            if (directionalLightsBuffer != null) voxelize.SetBuffer(compute_main, "DirectionalLights", directionalLightsBuffer);
             if (pointLightsBuffer != null) voxelize.SetBuffer(compute_main, "PointLights", pointLightsBuffer);
             if (spotLightsBuffer != null) voxelize.SetBuffer(compute_main, "SpotLights", spotLightsBuffer);
             if (areaLightsBuffer != null) voxelize.SetBuffer(compute_main, "AreaLights", areaLightsBuffer);
@@ -297,11 +260,13 @@ namespace BakedVolumetrics
 
             voxelize.SetTexture(compute_main, "SceneAlbedo", voxelAlbedoBuffer);
             voxelize.SetTexture(compute_main, "SceneEmissive", voxelEmissiveBuffer);
-            voxelize.SetTexture(compute_main, "SceneNormal", voxelNormalBuffer);
-            voxelize.SetTexture(compute_main, "ScenePosition", voxelPositionBuffer);
             voxelize.SetTexture(compute_main, "Write", volumeWrite);
 
-            voxelize.Dispatch(compute_main, voxelResolution.x, voxelResolution.y, voxelResolution.z);
+            voxelize.SetVector("VolumePosition", transform.position);
+            voxelize.SetVector("VolumeSize", voxelSize);
+
+            //voxelize.Dispatch(compute_main, voxelResolution.x, voxelResolution.y, voxelResolution.z);
+            voxelize.Dispatch(compute_main, Mathf.CeilToInt(voxelResolution.x / 8f), Mathf.CeilToInt(voxelResolution.y / 8f), Mathf.CeilToInt(voxelResolution.z / 8f));
 
             //|||||||||||||||||||||||||||||||||||||||||| RESULT ||||||||||||||||||||||||||||||||||||||||||
             //|||||||||||||||||||||||||||||||||||||||||| RESULT ||||||||||||||||||||||||||||||||||||||||||
@@ -327,9 +292,6 @@ namespace BakedVolumetrics
         {
             if (bakeAlbedo) GenerateVolume(cameraVoxelAlbedoShader, string.Format("{0}_albedo", voxelName), rendertextureformat, textureformat);
             if (bakeEmissive) GenerateVolume(cameraVoxelEmissiveShader, string.Format("{0}_emissive", voxelName), rendertextureformat, textureformat);
-            if (bakeNormal) GenerateVolume(cameraVoxelNormalShader, string.Format("{0}_normal", voxelName), rendertextureformat, textureformat);
-            //if (bakePosition) GenerateVolume(cameraVoxelPositionShader, string.Format("{0}_position", voxelName), rendertextureformat, textureformat);
-            if (bakePosition) GenerateWorldPositionVolume(string.Format("{0}_position", voxelName));
         }
 
         [ContextMenu("Generate Buffers and Trace Scene")]
@@ -337,34 +299,6 @@ namespace BakedVolumetrics
         {
             GenerateVolumes();
             TraceScene();
-        }
-
-        public void GenerateWorldPositionVolume(string filename)
-        {
-            //--------------------- COMBINE RESULTS ---------------------
-            Texture3D result = new Texture3D(voxelResolution.x, voxelResolution.y, voxelResolution.z, DefaultFormat.HDR, TextureCreationFlags.None);
-            result.filterMode = FilterMode.Point;
-
-            for (int x = 0; x < result.width; x++)
-            {
-                for (int y = 0; y < result.height; y++)
-                {
-                    for (int z = 0; z < result.depth; z++)
-                    {
-                        float x_offset = voxelSize.x / voxelResolution.x;
-                        float y_offset = voxelSize.y / voxelResolution.y;
-                        float z_offset = voxelSize.z / voxelResolution.z;
-                        Vector3 probePosition = new Vector3(transform.position.x + (x * x_offset), transform.position.y + (y * y_offset), transform.position.z + (z * z_offset));
-
-                        Color colorResult = new Color(probePosition.x, probePosition.y, probePosition.z, 1.0f);
-
-                        result.SetPixel(x, y, z, colorResult);
-                    }
-                }
-            }
-
-            //--------------------- FINAL ---------------------
-            SaveVolumeTexture(filename, result);
         }
 
         public void GenerateVolume(Shader replacementShader, string filename, RenderTextureFormat rtFormat, TextureFormat texFormat)
@@ -391,7 +325,7 @@ namespace BakedVolumetrics
             Texture2D[] slices_x_pos = new Texture2D[voxelResolution.x];
 
             voxelCameraSlice = new RenderTexture(voxelResolution.z, voxelResolution.y, rtDepth, rtFormat);
-            voxelCameraSlice.antiAliasing = enableAnitAliasing ? 8 : 0;
+            voxelCameraSlice.antiAliasing = enableAnitAliasing ? 8 : 1;
             voxelCameraSlice.filterMode = FilterMode.Point;
             voxelCamera.targetTexture = voxelCameraSlice;
             voxelCamera.orthographicSize = voxelSize.y * 0.5f;
@@ -423,7 +357,7 @@ namespace BakedVolumetrics
             Texture2D[] slices_y_neg = new Texture2D[voxelResolution.y];
 
             voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.z, rtDepth, rtFormat);
-            voxelCameraSlice.antiAliasing = enableAnitAliasing ? 8 : 0;
+            voxelCameraSlice.antiAliasing = enableAnitAliasing ? 8 : 1;
             voxelCameraSlice.filterMode = FilterMode.Point;
             voxelCamera.targetTexture = voxelCameraSlice;
             voxelCamera.orthographicSize = voxelSize.z * 0.5f;
@@ -455,7 +389,7 @@ namespace BakedVolumetrics
             Texture2D[] slices_z_neg = new Texture2D[voxelResolution.z];
 
             voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.y, rtDepth, rtFormat);
-            voxelCameraSlice.antiAliasing = enableAnitAliasing ? 8 : 0;
+            voxelCameraSlice.antiAliasing = enableAnitAliasing ? 8 : 1;
             voxelCameraSlice.filterMode = FilterMode.Point;
             voxelCamera.targetTexture = voxelCameraSlice;
             voxelCamera.orthographicSize = voxelSize.y * 0.5f;
@@ -481,6 +415,8 @@ namespace BakedVolumetrics
             }
 
             //--------------------- COMBINE RESULTS ---------------------
+
+            /*
             Texture3D result = new Texture3D(voxelResolution.x, voxelResolution.y, voxelResolution.z, DefaultFormat.HDR, TextureCreationFlags.None);
             result.filterMode = FilterMode.Point;
 
@@ -563,7 +499,50 @@ namespace BakedVolumetrics
                         result.SetPixel(x, y, z, colorResult);
                     }
                 }
+            }*/
+
+            Texture3D result = new Texture3D(voxelResolution.x, voxelResolution.y, voxelResolution.z, DefaultFormat.HDR, TextureCreationFlags.None);
+            result.filterMode = FilterMode.Point;
+
+            Color[] resultColors = new Color[result.width * result.height * result.depth];
+
+            for (int x = 0; x < result.width; x++)
+            {
+                for (int y = 0; y < result.height; y++)
+                {
+                    for (int z = 0; z < result.depth; z++)
+                    {
+                        Color colorResult = Color.clear;
+                        Color[] colors =
+                        {
+                            slices_x_pos[(result.width - 1) - x].GetPixel(z, y),
+                            slices_x_neg[x].GetPixel((result.depth - 1) - z, y),
+                            slices_y_pos[y].GetPixel(x, (result.depth - 1) - z),
+                            slices_y_neg[(result.height - 1) - y].GetPixel(x, z),
+                            slices_z_pos[z].GetPixel(x, y),
+                            slices_z_neg[(result.depth - 1) - z].GetPixel((result.width - 1) - x, y)
+                        };
+
+                        float alphaSum = 0.0f;
+
+                        foreach (Color c in colors)
+                        {
+                            colorResult += c * c.a;
+                            alphaSum += c.a;
+                        }
+
+                        if (alphaSum > 0)
+                        {
+                            colorResult /= alphaSum;
+                        }
+
+                        resultColors[x + y * result.width + z * result.width * result.height] = colorResult;
+                    }
+                }
             }
+
+            result.SetPixels(resultColors);
+            result.Apply();
 
             //--------------------- FINAL ---------------------
             SaveVolumeTexture(filename, result);
@@ -580,7 +559,6 @@ namespace BakedVolumetrics
             string volumeAssetName = fileName + ".asset";
             string volumeAssetPath = sceneVolumetricsFolder + "/" + volumeAssetName;
 
-            //AssetDatabase.DeleteAsset(volumeAssetPath);
             AssetDatabase.CreateAsset(tex3D, volumeAssetPath);
         }
 

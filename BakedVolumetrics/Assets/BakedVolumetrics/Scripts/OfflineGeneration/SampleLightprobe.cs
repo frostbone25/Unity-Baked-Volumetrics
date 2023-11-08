@@ -30,11 +30,10 @@ namespace BakedVolumetrics
                 test_indoor = hit_up && hit_down && hit_left && hit_right && hit_forward && hit_back;
             }
 
-            if (!test_indoor)
+            if (!test_indoor || !test_leak)
+            {
                 return Color.black;
-
-            if (!test_leak)
-                return Color.black;
+            }
 
             SphericalHarmonicsL2 sphericalHarmonicsL2 = new SphericalHarmonicsL2();
             Renderer renderer = new Renderer();

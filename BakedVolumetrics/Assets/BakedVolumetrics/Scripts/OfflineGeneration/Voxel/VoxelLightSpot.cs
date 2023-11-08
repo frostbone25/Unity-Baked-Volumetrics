@@ -25,6 +25,16 @@ public struct VoxelLightSpot
 
         return size;
     }
+
+    public VoxelLightSpot(Light spotLight)
+    {
+        lightColor = new Vector3(spotLight.color.r, spotLight.color.g, spotLight.color.b);
+        lightIntensity = spotLight.intensity;
+        lightPosition = spotLight.transform.position;
+        lightDirection = spotLight.transform.forward;
+        lightRange = spotLight.range;
+        lightAngle = spotLight.spotAngle;
+    }
 }
 
 #endif

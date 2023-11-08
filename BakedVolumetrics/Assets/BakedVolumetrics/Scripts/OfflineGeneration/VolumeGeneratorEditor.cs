@@ -99,7 +99,8 @@ namespace BakedVolumetrics
 
             voxelDensitySize.floatValue = Mathf.Max(0.0f, voxelDensitySize.floatValue);
 
-            EditorGUILayout.LabelField(string.Format("[{0}x{1}x{2}] {3} voxels.", scriptObject.GetVoxelResolution().x, scriptObject.GetVoxelResolution().y, scriptObject.GetVoxelResolution().z, scriptObject.GetTotalVoxelCount()), EditorStyles.helpBox);
+            EditorGUILayout.LabelField(string.Format("Resolution: {0}x{1}x{2} [{3}] voxels.", scriptObject.GetVoxelResolution().x, scriptObject.GetVoxelResolution().y, scriptObject.GetVoxelResolution().z, scriptObject.GetTotalVoxelCount()), EditorStyles.helpBox);
+            EditorGUILayout.LabelField(string.Format("Disk/Memory Size: {0} MB [{1} KB] [{2} BYTES]", Mathf.RoundToInt((float)(scriptObject.GetVolumeSpaceUsage() * 0.0001)) * 0.01, Mathf.RoundToInt((float)(scriptObject.GetVolumeSpaceUsage() * 0.001)), scriptObject.GetVolumeSpaceUsage()), EditorStyles.helpBox);
             EditorGUILayout.Space(10);
 
             //||||||||||||||||||||||||||||||||| VOLUME RENDERING |||||||||||||||||||||||||||||||||
@@ -119,30 +120,40 @@ namespace BakedVolumetrics
             //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
             EditorGUILayout.Space(10);
             EditorGUILayout.LabelField("Volume Density", EditorStyles.whiteLargeLabel);
-            EditorGUILayout.PropertyField(densityType);
 
-            DensityType densityTypeValue = (DensityType)densityType.intValue;
-
-            if (densityTypeValue == DensityType.Constant)
+            if((VolumeBitDepth)volumeBitDepth.intValue == VolumeBitDepth.RGB8)
             {
-                EditorGUILayout.PropertyField(densityConstant);
+                EditorGUILayout.LabelField("Bit Depth is set to RGB8, which has no alpha channel. This means that density will have to be constant since we don't have an alpha channel to set a unique value for every voxel.", EditorStyles.helpBox);
+
+                densityType.intValue = 0; //0 = Constant
             }
-            else if (densityTypeValue == DensityType.HeightBased || densityTypeValue == DensityType.HeightBasedLuminance)
+            else
             {
-                EditorGUILayout.PropertyField(densityTop);
-                EditorGUILayout.PropertyField(densityBottom);
+                EditorGUILayout.PropertyField(densityType);
 
-                EditorGUILayout.PropertyField(densityHeight);
-                EditorGUILayout.PropertyField(densityHeightFallof);
-            }
+                DensityType densityTypeValue = (DensityType)densityType.intValue;
 
-            if (densityTypeValue == DensityType.Luminance)
-            {
-                EditorGUILayout.PropertyField(densityInvertLuminance);
-            }
-            else if(densityTypeValue == DensityType.HeightBasedLuminance)
-            {
-                EditorGUILayout.PropertyField(densityInvertLuminance);
+                if (densityTypeValue == DensityType.Constant)
+                {
+                    EditorGUILayout.PropertyField(densityConstant);
+                }
+                else if (densityTypeValue == DensityType.HeightBased || densityTypeValue == DensityType.HeightBasedLuminance)
+                {
+                    EditorGUILayout.PropertyField(densityTop);
+                    EditorGUILayout.PropertyField(densityBottom);
+
+                    EditorGUILayout.PropertyField(densityHeight);
+                    EditorGUILayout.PropertyField(densityHeightFallof);
+                }
+
+                if (densityTypeValue == DensityType.Luminance)
+                {
+                    EditorGUILayout.PropertyField(densityInvertLuminance);
+                }
+                else if (densityTypeValue == DensityType.HeightBasedLuminance)
+                {
+                    EditorGUILayout.PropertyField(densityInvertLuminance);
+                }
             }
 
             //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||

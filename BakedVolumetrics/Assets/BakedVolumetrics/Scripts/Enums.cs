@@ -34,7 +34,7 @@ namespace BakedVolumetrics
     public enum LightingSource
     {
         LightProbes,
-        VoxelRaytrace,
+        //VoxelRaytrace,
         CPU_Raytrace,
         IBL
     }
@@ -58,6 +58,12 @@ namespace BakedVolumetrics
         X,
         Y,
         Z
+    }
+
+    public enum AmbientLightingType
+    {
+        Flat,
+        Skylight
     }
 }
 #endif

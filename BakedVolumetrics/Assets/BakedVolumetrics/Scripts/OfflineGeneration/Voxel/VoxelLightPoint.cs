@@ -21,6 +21,14 @@ public struct VoxelLightPoint
 
         return size;
     }
+
+    public VoxelLightPoint(Light pointLight)
+    {
+        lightColor = new Vector3(pointLight.color.r, pointLight.color.g, pointLight.color.b);
+        lightIntensity = pointLight.intensity;
+        lightPosition = pointLight.transform.position;
+        lightRange = pointLight.range;
+    }
 }
 
 #endif

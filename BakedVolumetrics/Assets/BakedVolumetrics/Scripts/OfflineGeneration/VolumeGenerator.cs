@@ -9,6 +9,12 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unity.Jobs;
+using UnityEditor.Profiling;
+using UnityEngine.Profiling;
+using Unity.Collections;
+using UnityEngine.UIElements;
+using static BakedVolumetrics.SampleCPURaytrace;
 
 namespace BakedVolumetrics
 {
@@ -49,7 +55,7 @@ namespace BakedVolumetrics
         public bool densityInvertLuminance = false;
 
         public SampleLightprobe sampleLightprobe;
-        public SampleVoxelRaytrace sampleVoxelRaytrace;
+        //public SampleVoxelRaytrace sampleVoxelRaytrace;
         public SampleCPURaytrace sampleCPURaytrace;
         public SampleIBL sampleIBL;
         public VolumePostFilters volumePostFilters;
@@ -71,6 +77,23 @@ namespace BakedVolumetrics
         public int GetTotalVoxelCount() => volumeResolution.x * volumeResolution.y * volumeResolution.z;
 
         public Vector3Int GetVoxelResolution() => volumeResolution;
+
+        public long GetVolumeSpaceUsage()
+        {
+            //build the paths
+            UnityEngine.SceneManagement.Scene activeScene = EditorSceneManager.GetActiveScene();
+            string sceneName = activeScene.name;
+            string sceneVolumetricsFolder = "Assets/BakedVolumetrics/Data/" + sceneName;
+            string volumeAssetName = volumeName + ".asset";
+            string volumeAssetPath = sceneVolumetricsFolder + "/" + volumeAssetName;
+
+            Texture3D volumeAsset = AssetDatabase.LoadAssetAtPath<Texture3D>(volumeAssetPath);
+
+            if (volumeAsset == null)
+                return 0;
+            else
+                return Profiler.GetRuntimeMemorySizeLong(volumeAsset);
+        }
 
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -125,14 +148,14 @@ namespace BakedVolumetrics
             sampleCPURaytrace = gameObject.GetComponent<SampleCPURaytrace>();
             sampleLightprobe = gameObject.GetComponent<SampleLightprobe>();
             volumePostFilters = gameObject.GetComponent<VolumePostFilters>();
-            sampleVoxelRaytrace = gameObject.GetComponent<SampleVoxelRaytrace>();
+            //sampleVoxelRaytrace = gameObject.GetComponent<SampleVoxelRaytrace>();
             sampleIBL = gameObject.GetComponent<SampleIBL>();
 
             if (sampleLightprobe == null)
                 sampleLightprobe = gameObject.AddComponent<SampleLightprobe>();
 
-            if (sampleVoxelRaytrace == null)
-                sampleVoxelRaytrace = gameObject.AddComponent<SampleVoxelRaytrace>();
+            //if (sampleVoxelRaytrace == null)
+                //sampleVoxelRaytrace = gameObject.AddComponent<SampleVoxelRaytrace>();
 
             if (sampleCPURaytrace == null)
                 sampleCPURaytrace = gameObject.AddComponent<SampleCPURaytrace>();
@@ -216,85 +239,6 @@ namespace BakedVolumetrics
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| MAIN ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
-        private static Vector3 GetLuminance()
-        {
-            if (PlayerSettings.colorSpace == ColorSpace.Gamma)
-                return new Vector3(0.22f, 0.707f, 0.071f);
-            else if (PlayerSettings.colorSpace == ColorSpace.Linear)
-                return new Vector3(0.0396819152f, 0.45802179f, 0.00609653955f);
-            else
-                return Vector3.one;
-        }
-
-        private void SampleVolumetricColor(int x, int y, int z, float x_offset, float y_offset, float z_offset)
-        {
-            Vector3 probePosition = new Vector3(transform.position.x + (x * x_offset), transform.position.y + (y * y_offset), transform.position.z + (z * z_offset));
-            Vector3 voxelWorldSize = new Vector3(x_offset, y_offset, z_offset);
-
-            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
-            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
-            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
-            Color colorResult = Color.black;
-
-            if (lightingSource == LightingSource.CPU_Raytrace)
-                colorResult = sampleCPURaytrace.SampleVolumetricColor(probePosition, voxelWorldSize);
-            else if (lightingSource == LightingSource.LightProbes)
-                colorResult = sampleLightprobe.SampleVolumetricColor(probePosition, voxelWorldSize);
-            else if (lightingSource == LightingSource.IBL)
-                colorResult = sampleIBL.SampleVolumetricColor(probePosition, voxelWorldSize);
-            /*
-            if (lightingSource == LightingSource.Combined)
-            {
-                Color raytraceColor = sampleRaytrace.SampleVolumetricColor(probePosition, voxelWorldSize);
-                Color lightprobeColor = sampleLightprobe.SampleVolumetricColor(probePosition, voxelWorldSize);
-
-                if (combineColorType == CombineColorType.Lerp)
-                    colorResult = Color.Lerp(lightprobeColor, raytraceColor, lerpFactor);
-                else if (combineColorType == CombineColorType.Additive)
-                    colorResult = (raytraceColor * additiveRaytracedIntensity) + (lightprobeColor * additiveLightprobeIntensity);
-            }
-            */
-
-            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-            float alphaResult = 1.0f;
-
-            if (densityType == DensityType.Constant)
-            {
-                alphaResult = densityConstant;
-            }
-            else if(densityType == DensityType.Luminance)
-            {
-                Vector3 luminance = GetLuminance();
-                Vector3 colorAsVector = new Vector3(colorResult.r, colorResult.g, colorResult.b);
-
-                alphaResult = densityInvertLuminance ? 1 - Vector3.Dot(colorAsVector, luminance) : Vector3.Dot(colorAsVector, luminance);
-            }
-            else if(densityType == DensityType.HeightBased)
-            {
-                float lerpFactor = Mathf.Clamp((probePosition.y - densityHeight) / densityHeightFallof, 0.0f, 1.0f);
-                alphaResult = Mathf.Lerp(densityBottom, densityTop, lerpFactor);
-            }
-            else if (densityType == DensityType.HeightBasedLuminance)
-            {
-                Vector3 luminance = GetLuminance();
-                Vector3 colorAsVector = new Vector3(colorResult.r, colorResult.g, colorResult.b);
-
-                float lumaResult = densityInvertLuminance ? 1 - Vector3.Dot(colorAsVector, luminance) : Vector3.Dot(colorAsVector, luminance);
-                float lerpFactor = Mathf.Clamp((probePosition.y - densityHeight) / densityHeightFallof, 0.0f, 1.0f);
-                alphaResult = Mathf.Lerp(lumaResult * densityBottom, lumaResult * densityTop, lerpFactor);
-            }
-
-            colorResult = new Color(colorResult.r, colorResult.g, colorResult.b, alphaResult);
-
-            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
-            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
-            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
-            Vector3Int volumeTexturePosition = new Vector3Int(x + (volumeResolution.x / 2), y + (volumeResolution.y / 2), z + (volumeResolution.z / 2));
-            volumeTexture.SetPixel(volumeTexturePosition.x, volumeTexturePosition.y, volumeTexturePosition.z, colorResult);
-        }
-
         public void GenerateVolume(int mode)
         {
             //double timeBeforeBake = Time.realtimeSinceStartupAsDouble;
@@ -321,11 +265,21 @@ namespace BakedVolumetrics
                 if (lightingSource == LightingSource.IBL)
                     sampleIBL.Setup();
 
+                //hide the mesh before baking (just to not accidentally skew results with some of the other solutions to sampling lighting).
                 if (fogSceneObject != null)
                     fogSceneObject.SetActive(false);
 
                 UpdateProgressBar("Rendering volume...", 0.5f);
 
+                //NativeArray<Color> colorResults = new NativeArray<Color>(GetTotalVoxelCount(), Allocator.Persistent);
+                //NativeArray<JobHandle> jobHandles = new NativeArray<JobHandle>(GetTotalVoxelCount(), Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+                // Initialize the job data
+                //SampleCPURaytraceJob job = new SampleCPURaytraceJob();
+
+                //colorResults.Dispose();
+
+                //Compute Colors
                 for (int x = -volumeResolution.x / 2; x <= volumeResolution.x / 2; x++)
                 {
                     float x_offset = volumeSize.x / volumeResolution.x;
@@ -338,7 +292,40 @@ namespace BakedVolumetrics
                         {
                             float z_offset = volumeSize.z / volumeResolution.z;
 
-                            SampleVolumetricColor(x, y, z, x_offset, y_offset, z_offset);
+                            Vector3 probePosition = new Vector3(transform.position.x + (x * x_offset), transform.position.y + (y * y_offset), transform.position.z + (z * z_offset));
+                            Vector3 voxelWorldSize = new Vector3(x_offset, y_offset, z_offset);
+
+                            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
+                            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
+                            //|||||||||||||||||||| COLOR (RGB) ||||||||||||||||||||||||
+                            Color colorResult = Color.black;
+
+                            if (lightingSource == LightingSource.CPU_Raytrace)
+                            {
+                                colorResult = sampleCPURaytrace.SampleVolumetricColor(probePosition, voxelWorldSize);
+                            }
+                            else if (lightingSource == LightingSource.LightProbes)
+                            {
+                                colorResult = sampleLightprobe.SampleVolumetricColor(probePosition, voxelWorldSize);
+                            }
+                            else if (lightingSource == LightingSource.IBL)
+                            {
+                                colorResult = sampleIBL.SampleVolumetricColor(probePosition, voxelWorldSize);
+                            }
+
+                            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+                            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+                            //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
+                            float alphaResult = VolumeDensity.ComputeDensity(densityType, probePosition, colorResult, densityConstant, densityHeight, densityHeightFallof, densityBottom, densityTop, densityInvertLuminance);
+
+                            colorResult = new Color(colorResult.r, colorResult.g, colorResult.b, alphaResult);
+
+                            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
+                            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
+                            //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
+                            Vector3Int volumeTexturePosition = new Vector3Int(x + (volumeResolution.x / 2), y + (volumeResolution.y / 2), z + (volumeResolution.z / 2));
+                            volumeTexture.SetPixel(volumeTexturePosition.x, volumeTexturePosition.y, volumeTexturePosition.z, colorResult);
+                            //volumeTexture.SetPixels()
                         }
                     }
                 }
@@ -348,6 +335,7 @@ namespace BakedVolumetrics
                 if (lightingSource == LightingSource.IBL)
                     sampleIBL.Cleanup();
 
+                //show the mesh after baking (again just to not accidentally skew results with some of the other solutions to sampling lighting).
                 if (fogSceneObject != null)
                     fogSceneObject.SetActive(true);
 

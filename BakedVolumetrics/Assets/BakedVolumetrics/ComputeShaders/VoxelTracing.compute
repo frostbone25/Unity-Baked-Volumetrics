@@ -26,12 +26,19 @@ struct LightSpot
 struct LightArea
 {
     float3 lightPosition;
-    float3 lightDirection;
+    float3 lightForwardDirection;
+    float3 lightRightDirection;
+    float3 lightUpwardDirection;
     float2 lightSize;
     float3 lightColor;
     float lightIntensity;
     float lightRange;
 };
+
+bool DirectionalLightsExist;
+bool PointLightsExist;
+bool SpotLightsExist;
+bool AreaLightsExist;
 
 RWStructuredBuffer<LightDirectional> DirectionalLights;
 RWStructuredBuffer<LightPoint> PointLights;
@@ -46,6 +53,10 @@ Texture3D<float4> SceneEmissive;
 Texture3D<float4> SceneNormal;
 Texture3D<float4> ScenePosition;
 RWTexture3D<float4> Write;
+
+float3 VolumePosition;
+float3 VolumeSize;
+float3 VolumeResolution;
 
 float4 TEX2D_SHARP(Texture2D<float4> tex, float2 uv)
 {
@@ -67,19 +78,33 @@ float4 TEX3D(Texture3D<float4> tex, float3 position)
     return tex.SampleLevel(_LinearClamp, position, 0);
 }
 
-//properties
-float3 VolumeResolution;
-
-float3 SampleNormals(float3 voxelPosition, float3 id, float sceneAlpha)
+float CalculateAttenuation(float distanceToSource)
 {
-    float yNegative = 0;
+    //return 1.0f / (distanceToSource * distanceToSource); //inverse square falloff
+    return 1.0f / distanceToSource; //linear falloff;
 
-    for (int y_neg = 0; y_neg < VolumeResolution.y; y_neg++)
-    {
+    //return 1.0f / pow(distanceToSource, 4.0);
+}
 
-    }
+// Function to estimate the surface normal at a given 3D texture position
+float3 EstimateSurfaceNormal(float3 texCoord)
+{
+    // Compute the step size between neighboring 3D texture samples
+    float3 delta = 1.0 / VolumeResolution.xyz;
 
-    return float3(0, 0, 0);
+    // Sample the 3D texture at the current position and its neighboring positions
+    float center = TEX3D_SHARP(SceneAlbedo, texCoord).a;
+    float dx = TEX3D_SHARP(SceneAlbedo, texCoord + float3(delta.x, 0.0, 0.0)).a;
+    float dy = TEX3D_SHARP(SceneAlbedo, texCoord + float3(0.0, delta.y, 0.0)).a;
+    float dz = TEX3D_SHARP(SceneAlbedo, texCoord + float3(0.0, 0.0, delta.z)).a;
+
+    // Compute the gradient by subtracting neighboring samples
+    float3 gradient = float3(dx - center, dy - center, dz - center);
+
+    // Calculate the surface normal by normalizing the gradient
+    float3 normal = normalize(gradient);
+
+    return normal;
 }
 
 #pragma kernel CSMain
@@ -90,59 +115,221 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float3 voxelPosition = id.xyz + float3(0.5, 0.5, 0.5);
     voxelPosition /= VolumeResolution.xyz;
 
+    float3 singleVoxelSize = VolumeSize / VolumeResolution;
+
+    float3 worldVoxelPosition = VolumePosition + (voxelPosition * VolumeSize) - (VolumeSize / 2.0);
+
     //buffers
     float4 sceneAlbedo = TEX3D_SHARP(SceneAlbedo, voxelPosition);
     float4 sceneEmissive = TEX3D_SHARP(SceneEmissive, voxelPosition);
-    //float4 sceneNormal = TEX3D_SHARP(SceneNormal, voxelPosition) * 2.0f - 1.0f;
     float4 scenePosition = TEX3D_SHARP(ScenePosition, voxelPosition);
 
-    float3 worldPosition = scenePosition + voxelPosition;
-
-    //SAMPLE NORMAL
-    float3 sceneNormal = SampleNormals(voxelPosition, float3(id.x, id.y, id.z), sceneAlbedo.a);
-    
     //trace lights
-    float4 finalColor = float4(0, 0, 0, sceneAlbedo.a);
+    //float4 finalColor = float4(0, 0, 0, sceneAlbedo.a);
+    float4 finalColor = float4(0, 0, 0, 1);
 
-    //finalColor.rgb += float3(1,1,1) * dot(sceneNormal, float3(1, 1, 0));
-
-    //spot lights
-    for (int i = 0; i < SpotLights.Length; i++)
+    //|||||||||||||||||||||||||||||||||||| SPOT LIGHTS ||||||||||||||||||||||||||||||||||||
+    //|||||||||||||||||||||||||||||||||||| SPOT LIGHTS ||||||||||||||||||||||||||||||||||||
+    //|||||||||||||||||||||||||||||||||||| SPOT LIGHTS ||||||||||||||||||||||||||||||||||||
+    if (SpotLightsExist)
     {
-        LightSpot spot = SpotLights[i];
-
-        float lightDistance = distance(spot.lightPosition, worldPosition);
-
-        float3 lightColorSample = SpotLights[i].lightColor * SpotLights[i].lightIntensity;
-        float lightDistanceSample = 1.0f / (lightDistance * lightDistance);
-        float3 lightWorldDirection = normalize(worldPosition - spot.lightPosition);
-        float lightAngle = dot(lightWorldDirection, normalize(spot.lightDirection));
-        lightAngle = lightAngle * 180;
-
-        //lightDistanceSample *= SpotLights[i].lightRange;
-
-        if (lightAngle > SpotLights[i].lightAngle)
-            finalColor.rgb += lightColorSample * lightDistanceSample;
-
-        /*
-        float3 currentVoxelRayPos = voxelPosition;
-        float3 currentVoxelRayDir = lightWorldDirection;
-
-        for (int j = 0; j < 32; j++)
+        for (int x = 0; x < SpotLights.Length; x++)
         {
-            float4 newSample = TEX3D(SceneAlbedo, currentVoxelRayPos.xyz);
+            LightSpot spotLight = SpotLights[x];
 
-            //if (lightAngle > SpotLights[i].lightAngle && newSample.a != 0.0f)
+            float distanceToSpotLight = distance(worldVoxelPosition, spotLight.lightPosition);
+            float spotLightDistanceSample = CalculateAttenuation(distanceToSpotLight);
+            float3 spotLightWorldDirection = normalize(worldVoxelPosition - spotLight.lightPosition);
+
+            // Calculate the cosine of the angle corresponding to the spot light's cone angle
+            float cosConeAngle = cos(radians(spotLight.lightAngle / 2.0));
+
+            // Calculate the spot light influence (0.0 to 1.0) based on the angle between the light direction and the spotlight direction
+            float spotLightAngle = saturate((dot(spotLightWorldDirection, spotLight.lightDirection) - cosConeAngle) / (1.0 - cosConeAngle));
+
+            // Calculate the spot light range influence
+            float spotLightRange = saturate(1.0 - (distanceToSpotLight / spotLight.lightRange));
+
+            float3 spotLight_currentRayPosition = worldVoxelPosition;
+            float3 spotLight_currentRayDirection = -spotLightWorldDirection;
+            float3 spotLightColorSample = spotLight.lightColor * spotLight.lightIntensity;
+
+            //------------------------------ DIRECT LIGHT ------------------------------
+            //------------------------------ DIRECT LIGHT ------------------------------
+            //------------------------------ DIRECT LIGHT ------------------------------
+
+            bool spotLight_isOccluded = false;
+            float3 spotLight_hitPosition = float3(0, 0, 0);
+            float3 spotLight_hitNormal = float3(0, 1, 0);
+            float3 spotLight_hitAlbedo = float3(1, 1, 1);
+
+            while (distance(spotLight_currentRayPosition, spotLight.lightPosition) > 0.5f)
+            //while (distance(spotLight_currentRayPosition, spotLight.lightPosition) > length(min(float3(0, 0, 0), singleVoxelSize)))
             {
-                finalColor.rgb += lightColorSample * lightDistanceSample;
+                float3 spotLight_scaledRayPosition = ((spotLight_currentRayPosition + (VolumeSize / 2.0)) - VolumePosition) / VolumeSize;
+                float4 spotLight_sceneAlbedoSample = TEX3D_SHARP(SceneAlbedo, spotLight_scaledRayPosition);
+
+                if (spotLight_sceneAlbedoSample.a > 0.0)
+                {
+                    //spotLight_hitPosition = spotLight_currentRayPosition;
+                    //spotLight_hitNormal = EstimateSurfaceNormal(spotLight_scaledRayPosition);
+                    //spotLight_hitAlbedo = spotLight_sceneAlbedoSample.rgb;
+                    spotLight_isOccluded = true;
+                    break;
+                }
+
+                //keep stepping the ray in world space
+                spotLight_currentRayPosition += spotLight_currentRayDirection / length(VolumeResolution);
             }
 
-            currentVoxelRayPos += currentVoxelRayDir * float3(1.0f / VolumeResolution.x, 1.0f / VolumeResolution.y, 1.0f / VolumeResolution.z);
+            if (spotLight_isOccluded == false)
+            {
+                //finalColor.rgb += spotLightColorSample * spotLightDistanceSample * spotLightAngle;
+                finalColor.rgb += spotLightColorSample * spotLightDistanceSample * spotLightAngle * spotLightRange;
+            }
+        }
+    }
+
+    //|||||||||||||||||||||||||||||||||||| POINT LIGHTS ||||||||||||||||||||||||||||||||||||
+    //|||||||||||||||||||||||||||||||||||| POINT LIGHTS ||||||||||||||||||||||||||||||||||||
+    //|||||||||||||||||||||||||||||||||||| POINT LIGHTS ||||||||||||||||||||||||||||||||||||
+    if (PointLightsExist)
+    {
+        for (int y = 0; y < PointLights.Length; y++)
+        {
+            LightPoint pointLight = PointLights[y];
+
+            float distanceToPointLight = distance(worldVoxelPosition, pointLight.lightPosition);
+            float3 pointLightColorSample = pointLight.lightColor * pointLight.lightIntensity;
+            float pointLightDistanceSample = CalculateAttenuation(distanceToPointLight);
+
+            float pointLightRange = saturate(1.0 - (distanceToPointLight / pointLight.lightRange));
+
+            float3 pointLightWorldDirection = normalize(worldVoxelPosition - pointLight.lightPosition);
+
+            float3 pointLight_currentRayPosition = worldVoxelPosition;
+            float3 pointLight_currentRayDirection = -pointLightWorldDirection;
+
+            bool pointLight_isOccluded = false;
+
+            while (distance(pointLight_currentRayPosition, pointLight.lightPosition) > 0.5f)
+            //while (distance(pointLight_currentRayPosition, pointLight.lightPosition) > length(min(float3(0, 0, 0), singleVoxelSize)))
+            {
+                float3 pointLight_scaledRayPosition = ((pointLight_currentRayPosition + (VolumeSize / 2.0)) - VolumePosition) / VolumeSize;
+                float pointLight_sceneOcclusionSample = TEX3D_SHARP(SceneAlbedo, pointLight_scaledRayPosition).a;
+
+                if (pointLight_sceneOcclusionSample > 0.0)
+                {
+                    pointLight_isOccluded = true;
+                    break;
+                }
+
+                //keep stepping the ray in world space
+                pointLight_currentRayPosition += pointLight_currentRayDirection / length(VolumeResolution);
+            }
+
+            if (pointLight_isOccluded == false)
+            {
+                //finalColor.rgb += pointLightColorSample * pointLightDistanceSample;
+                finalColor.rgb += pointLightColorSample * pointLightDistanceSample * pointLightRange;
+            }
+        }
+    }
+
+    //|||||||||||||||||||||||||||||||||||| AREA LIGHTS ||||||||||||||||||||||||||||||||||||
+    //|||||||||||||||||||||||||||||||||||| AREA LIGHTS ||||||||||||||||||||||||||||||||||||
+    //|||||||||||||||||||||||||||||||||||| AREA LIGHTS ||||||||||||||||||||||||||||||||||||
+    if (AreaLightsExist)
+    {
+        /*
+        for (int z = 0; z < AreaLights.Length; z++)
+        {
+            LightArea areaLight = AreaLights[z];
+            float2 areaLightSize = areaLight.lightSize;
+            float3 areaLightForward = areaLight.lightForwardDirection;
+            float3 areaLightRight = areaLight.lightRightDirection;
+            float3 areaLightUp = areaLight.lightUpwardDirection;
+
+            //int areaWidthSamples = areaLightSize.x / singleVoxelSize.x;
+            //int areaHeightSamples = areaLightSize.y / singleVoxelSize.y;
+            //int areaWidthSamples = areaLightSize.x / length(singleVoxelSize);
+            //int areaHeightSamples = areaLightSize.y / length(singleVoxelSize);
+            int areaWidthSamples = areaLightSize.x / min(min(singleVoxelSize.x, singleVoxelSize.y), singleVoxelSize.z);
+            int areaHeightSamples = areaLightSize.y / min(min(singleVoxelSize.x, singleVoxelSize.y), singleVoxelSize.z);
+
+            for (int x = 0; x < areaWidthSamples; x++)
+            {
+                for (int y = 0; y < areaHeightSamples; y++)
+                {
+                    float3 areaLightSamplePosition = areaLight.lightPosition;
+                    areaLightSamplePosition += ((areaLightRight * (x - (areaWidthSamples / 2)))) * singleVoxelSize;
+                    areaLightSamplePosition += ((areaLightUp * (y - (areaHeightSamples / 2)))) * singleVoxelSize;
+
+                    float distanceToAreaLight = distance(worldVoxelPosition, areaLightSamplePosition);
+                    float areaLightDistanceSample = CalculateAttenuation(distanceToAreaLight);
+                    float3 areaLightWorldDirection = normalize(worldVoxelPosition - areaLightSamplePosition);
+
+                    float3 areaLight_currentRayPosition = worldVoxelPosition;
+                    float3 areaLight_currentRayDirection = -areaLightWorldDirection;
+                    float3 areaLightColorSample = areaLight.lightColor * areaLight.lightIntensity;
+
+                    //------------------------------ DIRECT LIGHT ------------------------------
+                    //------------------------------ DIRECT LIGHT ------------------------------
+                    //------------------------------ DIRECT LIGHT ------------------------------
+
+                    if (dot(areaLightWorldDirection, areaLightForward) > 0.0)
+                    {
+                        bool areaLight_isOccluded = false;
+                        float3 areaLight_hitPosition = float3(0, 0, 0);
+                        float3 areaLight_hitNormal = float3(0, 1, 0);
+                        float3 areaLight_hitAlbedo = float3(1, 1, 1);
+
+                        while (distance(areaLight_currentRayPosition, areaLightSamplePosition) > 0.5f)
+                        {
+                            float3 areaLight_scaledRayPosition = ((areaLight_currentRayPosition + (VolumeSize / 2.0)) - VolumePosition) / VolumeSize;
+                            float4 areaLight_sceneAlbedoSample = TEX3D_SHARP(SceneAlbedo, areaLight_scaledRayPosition);
+
+                            if (areaLight_sceneAlbedoSample.a > 0.0)
+                            {
+                                areaLight_isOccluded = true;
+                                break;
+                            }
+
+                            //keep stepping the ray in world space
+                            areaLight_currentRayPosition += areaLight_currentRayDirection / length(VolumeResolution);
+                        }
+
+                        if (areaLight_isOccluded == false)
+                        {
+                            finalColor.rgb += areaLightColorSample * areaLightDistanceSample;
+                        }
+                    }
+                }
+            }
         }
         */
     }
 
-    finalColor.rgb *= sceneAlbedo.rgb;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     finalColor = max(0.0f, finalColor);
 
     Write[id.xyz] = finalColor;

@@ -19,6 +19,13 @@ public struct VoxelLightDirectional
 
         return size;
     }
+
+    public VoxelLightDirectional(Light directionalLight)
+    {
+        lightColor = new Vector3(directionalLight.color.r, directionalLight.color.g, directionalLight.color.b);
+        lightDirection = directionalLight.transform.forward;
+        lightIntensity = directionalLight.intensity;
+    }
 }
 
 #endif

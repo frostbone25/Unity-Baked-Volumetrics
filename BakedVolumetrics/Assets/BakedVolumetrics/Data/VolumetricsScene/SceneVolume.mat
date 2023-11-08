@@ -9,7 +9,8 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: SceneVolume
   m_Shader: {fileID: 4800000, guid: 4c531454e78090b41bad275f01555477, type: 3}
-  m_ShaderKeywords: ANIMATED_NOISE SAMPLES_8
+  m_ShaderKeywords: ANIMATED_NOISE SAMPLES_32 _SAMPLES__16 _SKIPPIXELS_ONE _SKIPPIXELS_ONE_PIXEL
+    ___8
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -28,9 +29,15 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
+    - _: 0
+    - _Color: 0
     - _EnableAnimatedJitter: 0
-    - _RaymarchJitterStrength: 2
-    - _RaymarchStepSize: 50
+    - _HalfResolution: 0
+    - _MipQuadOptimization: 0
+    - _RaymarchJitterStrength: 1
+    - _RaymarchStepSize: 47.1
+    - _Samples: 1
+    - _SkipPixels: 1
     - _VolumeDensity: 1
     m_Colors:
     - _VolumePos: {r: -5, g: 14.5, b: 1, a: 0}

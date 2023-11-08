@@ -17,6 +17,7 @@ namespace BakedVolumetrics
     public class SampleCPURaytraceEditor : Editor
     {
         SerializedProperty raytracedAttenuationType;
+        SerializedProperty ambientLightingType;
         SerializedProperty ambientIntensity;
         SerializedProperty ambientColor;
         SerializedProperty doSkylight;
@@ -29,6 +30,8 @@ namespace BakedVolumetrics
         SerializedProperty pointLightsMultiplier;
         SerializedProperty occlusionPointFade;
         SerializedProperty spotLightsMultiplier;
+        SerializedProperty areaLightsMultiplier;
+        SerializedProperty occlusionAreaFade;
         SerializedProperty occlusionSpotFade;
         SerializedProperty spotLightBleedAmount;
         SerializedProperty occlusionLeakFactor;
@@ -41,11 +44,13 @@ namespace BakedVolumetrics
         SerializedProperty includeDirectionalLights;
         SerializedProperty includePointLights;
         SerializedProperty includeSpotLights;
+        SerializedProperty includeAreaLights;
         SerializedProperty showUI;
 
         void OnEnable()
         {
             raytracedAttenuationType = serializedObject.FindProperty("raytracedAttenuationType");
+            ambientLightingType = serializedObject.FindProperty("ambientLightingType");
             ambientIntensity = serializedObject.FindProperty("ambientIntensity");
             ambientColor = serializedObject.FindProperty("ambientColor");
             doSkylight = serializedObject.FindProperty("doSkylight");
@@ -56,9 +61,11 @@ namespace BakedVolumetrics
             directionalLightsMultiplier = serializedObject.FindProperty("directionalLightsMultiplier");
             occlusionDirectionalFade = serializedObject.FindProperty("occlusionDirectionalFade");
             pointLightsMultiplier = serializedObject.FindProperty("pointLightsMultiplier");
+            areaLightsMultiplier = serializedObject.FindProperty("areaLightsMultiplier");
             occlusionPointFade = serializedObject.FindProperty("occlusionPointFade");
             spotLightsMultiplier = serializedObject.FindProperty("spotLightsMultiplier");
             occlusionSpotFade = serializedObject.FindProperty("occlusionSpotFade");
+            occlusionAreaFade = serializedObject.FindProperty("occlusionAreaFade");
             spotLightBleedAmount = serializedObject.FindProperty("spotLightBleedAmount");
             occlusionLeakFactor = serializedObject.FindProperty("occlusionLeakFactor");
             doOcclusion = serializedObject.FindProperty("doOcclusion");
@@ -70,6 +77,7 @@ namespace BakedVolumetrics
             includeDirectionalLights = serializedObject.FindProperty("includeDirectionalLights");
             includePointLights = serializedObject.FindProperty("includePointLights");
             includeSpotLights = serializedObject.FindProperty("includeSpotLights");
+            includeAreaLights = serializedObject.FindProperty("includeAreaLights");
             showUI = serializedObject.FindProperty("showUI");
         }
 
@@ -90,6 +98,7 @@ namespace BakedVolumetrics
             sampleRaytrace.includeDirectionalLights = EditorGUILayout.ToggleLeft("Include Directional Lights", sampleRaytrace.includeDirectionalLights);
             sampleRaytrace.includePointLights = EditorGUILayout.ToggleLeft("Include Point Lights", sampleRaytrace.includePointLights);
             sampleRaytrace.includeSpotLights = EditorGUILayout.ToggleLeft("Include Spot Lights", sampleRaytrace.includeSpotLights);
+            sampleRaytrace.includeAreaLights = EditorGUILayout.ToggleLeft("Include Area Lights", sampleRaytrace.includeAreaLights);
             EditorGUILayout.EndVertical();
             EditorGUILayout.BeginVertical();
             EditorGUILayout.LabelField("Light Modes", EditorStyles.boldLabel);
@@ -164,6 +173,16 @@ namespace BakedVolumetrics
                 sampleRaytrace.spotLightsMultiplier = EditorGUILayout.FloatField("Spot Lights Multiplier", sampleRaytrace.spotLightsMultiplier);
                 if (sampleRaytrace.doOcclusion) sampleRaytrace.occlusionSpotFade = EditorGUILayout.Slider("Occlusion Fade", sampleRaytrace.occlusionSpotFade, 0.0f, 1.0f);
                 if (sampleRaytrace.doSpotLightBleed) sampleRaytrace.spotLightBleedAmount = EditorGUILayout.Slider("Bleed Amount", sampleRaytrace.spotLightBleedAmount, 0.0f, 1.0f);
+
+                EditorGUILayout.Space(10);
+            }
+
+            if (sampleRaytrace.includeAreaLights)
+            {
+                EditorGUILayout.LabelField("Area Lights", EditorStyles.boldLabel);
+
+                sampleRaytrace.areaLightsMultiplier = EditorGUILayout.FloatField("Area Lights Multiplier", sampleRaytrace.areaLightsMultiplier);
+                if (sampleRaytrace.doOcclusion) sampleRaytrace.occlusionAreaFade = EditorGUILayout.Slider("Occlusion Fade", sampleRaytrace.occlusionAreaFade, 0.0f, 1.0f);
 
                 EditorGUILayout.Space(10);
             }

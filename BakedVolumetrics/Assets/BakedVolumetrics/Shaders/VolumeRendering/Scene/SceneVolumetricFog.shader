@@ -1,4 +1,4 @@
-﻿Shader "SceneVolumetricFog"
+﻿        Shader "SceneVolumetricFog"
 {
     Properties
     {
@@ -10,10 +10,11 @@
         [Header(Raymarching)]
         _RaymarchStepSize("Raymarch Step Size", Float) = 25
 
-        [Header(Jitter)]
+        [Header(Rendering)]
+        [Toggle(_HALF_RESOLUTION)] _HalfResolution("Half Resolution", Float) = 1
+        [Toggle(_ANIMATED_NOISE)] _EnableAnimatedJitter("Animated Noise", Float) = 1
         _JitterTexture("Jitter Texture", 2D) = "white" {}
         _RaymarchJitterStrength("Raymarch Jitter", Float) = 2
-        [Toggle(_ANIMATED_NOISE)] _EnableAnimatedJitter("Animated Noise", Float) = 1
     }
 
     SubShader
@@ -31,11 +32,47 @@
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+
+            //NOTE: IF MIP QUAD OPTIMIZATION IS ENABLED
+            //WE HAVE TO TARGET 5.0
+
             #pragma multi_compile_instancing  
+
             #pragma multi_compile SAMPLES_8 SAMPLES_16 SAMPLES_24 SAMPLES_32 SAMPLES_48 SAMPLES_64 SAMPLES_128
+
             #pragma shader_feature_local _ANIMATED_NOISE
+            #pragma shader_feature_local _HALF_RESOLUTION
+
             #include "UnityCG.cginc"
 
+            #include "QuadIntrinsics.cginc"
+
+            #if defined (_HALF_RESOLUTION)
+                //#pragma target 5.0
+                
+                //#pragma require interpolators10
+                //#pragma require interpolators15
+                //#pragma require interpolators32
+                //#pragma require mrt4
+                //#pragma require mrt8
+                #pragma require derivatives
+                //#pragma require samplelod
+                //#pragma require fragcoord
+                //#pragma require integers
+                //#pragma require 2darray
+                #pragma require cubearray
+                //#pragma require instancing
+                //#pragma require geometry
+                //#pragma require compute
+                //#pragma require randomwrite
+                //#pragma require tesshw
+                //#pragma require tessellation
+                //#pragma require msaatex
+                //#pragma require sparsetex
+                //#pragma require framebufferfetch
+            #endif
+
+            ///*
             #ifdef SAMPLES_8
                 #define _RaymarchSteps 8
             #elif SAMPLES_16
@@ -52,8 +89,12 @@
                 #define _RaymarchSteps 128
             #else
                 #define _RaymarchSteps 32
-                //#define _RaymarchSteps 16384 //RTX 3080 STRESS TEST
             #endif
+            //*/
+
+            //#define _RaymarchSteps 16384 //RTX 3080 STRESS TEST
+            //#define _RaymarchSteps 32768 //RTX 3080 STRESS TEST
+            //#define _RaymarchSteps 8
 
             struct appdata
             {
@@ -105,7 +146,8 @@
 
             fixed noise(fixed2 uv)
             {
-                uv += r2_modified(_Time.y, uv);
+                //uv += r2_modified(_Time.y, uv);
+                uv += float2(_Time.y, _Time.y);
                 uv *= _ScreenParams.xy * _JitterTexture_TexelSize.xy;
 
                 return tex2Dlod(_JitterTexture, fixed4(uv, 0, 0));
@@ -113,7 +155,11 @@
 #else
             fixed noise(fixed2 uv)
             {
+#if defined (_HALF_RESOLUTION)
+                return tex2Dlod(_JitterTexture, fixed4(uv * _ScreenParams.xy * _JitterTexture_TexelSize.xy * 0.5, 0, 0));
+#else 
                 return tex2Dlod(_JitterTexture, fixed4(uv * _ScreenParams.xy * _JitterTexture_TexelSize.xy, 0, 0));
+#endif
             }
 #endif
 
@@ -140,92 +186,114 @@
                 //Single Pass Instanced Support
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
 
-                //get our screen uv coords
-                fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
-
-
-#if UNITY_UV_STARTS_AT_TOP
-                if (_CameraDepthTexture_TexelSize.y < 0)
-                {
-                    screenUV.y = 1 - screenUV.y;
-                }
-#endif
-
-#if UNITY_SINGLE_PASS_STEREO
-                // If Single-Pass Stereo mode is active, transform the
-                // coordinates to get the correct output UV for the current eye.
-                fixed4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
-                screenUV = (screenUV - scaleOffset.zw) / scaleOffset.xy;
-#endif
-
-                //draw our scene depth texture and linearize it
-                fixed linearDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.screenPos)));
-
-                //calculate the world position view plane for the camera
-                fixed3 cameraWorldPositionViewPlane = i.camRelativeWorldPos.xyz / dot(i.camRelativeWorldPos.xyz, unity_WorldToCamera._m20_m21_m22);
-
-                //get the world position vector
-                fixed3 worldPos = cameraWorldPositionViewPlane * linearDepth + _WorldSpaceCameraPos;
-
-                //scale our vectors to the volume
-                fixed3 scaledWorldPos = ((worldPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
-                fixed3 scaledCameraPos = ((_WorldSpaceCameraPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
-
-                // UV offset by orientation
-                fixed3 localViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
-
-                //compute jitter
-                //fixed jitter = 1.0f + noise(screenUV.xy * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
-                fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * _RaymarchJitterStrength;
-                //fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * ((_RaymarchStepSize / _RaymarchSteps));
-
-                //get our ray increment vector that we use so we can march into the scene. Jitter it also so we can mitigate banding/stepping artifacts
-                fixed3 raymarch_rayIncrement = normalize(i.camRelativeWorldPos.xyz) / _RaymarchSteps;
-
-                //get the length of the step
-                fixed stepLength = length(raymarch_rayIncrement);
-
-                //get our starting ray position from the camera
-                fixed3 raymarch_currentPos = _WorldSpaceCameraPos + raymarch_rayIncrement * jitter;
+                SETUP_QUAD_INTRINSICS(i.vertex)
 
                 //our final computed fog color
                 fixed4 result = fixed4(0, 0, 0, 0); //rgb = fog color, a = transmittance
 
-                //start marching
-                for (int i = 0; i < _RaymarchSteps; i++)
+#if defined (_HALF_RESOLUTION)
+                if (QuadGetLaneID() == 0)
                 {
-                    //scale the current ray position to be within the volume
-                    fixed3 scaledPos = ((raymarch_currentPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
+#endif
 
-                    //get the distances of the ray and the world position
-                    fixed distanceRay = distance(scaledCameraPos, scaledPos);
-                    fixed distanceWorld = distance(scaledCameraPos, scaledWorldPos);
 
-                    //make sure we are within our little box
-                    if (scaledPos.x < 1.0f && scaledPos.x > 0.0f && scaledPos.y < 1.0f && scaledPos.y > 0.0f && scaledPos.z < 1.0f && scaledPos.z > 0.0f)
+                    //get our screen uv coords
+                    fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
+
+
+#if UNITY_UV_STARTS_AT_TOP
+                    if (_CameraDepthTexture_TexelSize.y < 0)
                     {
-                        //IMPORTANT: Check the current position distance of our ray compared to where we started.
-                        //If our distance is less than that of the world then that means we aren't intersecting into any objects yet so keep accumulating.
-                        //And also keep going if we haven't reached the fullest density just yet.
-                        if (distanceRay < distanceWorld && result.a < 1.0f)
-                        {
-                            //sample the fog color (rgb = color, a = density)
-                            fixed4 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0));
+                        screenUV.y = 1 - screenUV.y;
+                    }
+#endif
 
-                            //accumulate the samples
-                            result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //this is slightly cheaper
-                            //result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //uses exponential falloff, looks a little nicer but may not be needed
+#if UNITY_SINGLE_PASS_STEREO
+                    // If Single-Pass Stereo mode is active, transform the
+                    // coordinates to get the correct output UV for the current eye.
+                    fixed4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
+                    screenUV = (screenUV - scaleOffset.zw) / scaleOffset.xy;
+#endif
+
+                    //draw our scene depth texture and linearize it
+                    fixed linearDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.screenPos)));
+
+                    //calculate the world position view plane for the camera
+                    fixed3 cameraWorldPositionViewPlane = i.camRelativeWorldPos.xyz / dot(i.camRelativeWorldPos.xyz, unity_WorldToCamera._m20_m21_m22);
+
+                    //get the world position vector
+                    fixed3 worldPos = cameraWorldPositionViewPlane * linearDepth + _WorldSpaceCameraPos;
+
+                    //return float4(linearDepth, linearDepth, linearDepth, 1);
+
+                    //scale our vectors to the volume
+                    fixed3 scaledWorldPos = ((worldPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
+                    fixed3 scaledCameraPos = ((_WorldSpaceCameraPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
+
+                    // UV offset by orientation
+                    fixed3 localViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
+
+                    //compute jitter
+                    //fixed jitter = 1.0f + noise(screenUV.xy * 10.0f) * _RaymarchStepSize * _RaymarchJitterStrength;
+                    fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * _RaymarchJitterStrength;
+                    //fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * ((_RaymarchStepSize / _RaymarchSteps));
+
+#if defined (_HALF_RESOLUTION)
+                    jitter *= 2.0f;
+#endif
+
+                    //get our ray increment vector that we use so we can march into the scene. Jitter it also so we can mitigate banding/stepping artifacts
+                    fixed3 raymarch_rayIncrement = normalize(i.camRelativeWorldPos.xyz) / _RaymarchSteps;
+
+                    //get the length of the step
+                    fixed stepLength = length(raymarch_rayIncrement);
+
+                    //get our starting ray position from the camera
+                    fixed3 raymarch_currentPos = _WorldSpaceCameraPos + raymarch_rayIncrement * jitter;
+
+                    //start marching
+                    for (int i = 0; i < _RaymarchSteps; i++)
+                    {
+                        //scale the current ray position to be within the volume
+                        fixed3 scaledPos = ((raymarch_currentPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
+
+                        //get the distances of the ray and the world position
+                        fixed distanceRay = distance(scaledCameraPos, scaledPos);
+                        fixed distanceWorld = distance(scaledCameraPos, scaledWorldPos);
+
+                        //make sure we are within our little box
+                        if (scaledPos.x < 1.0f && scaledPos.x > 0.0f && scaledPos.y < 1.0f && scaledPos.y > 0.0f && scaledPos.z < 1.0f && scaledPos.z > 0.0f)
+                        {
+                            //IMPORTANT: Check the current position distance of our ray compared to where we started.
+                            //If our distance is less than that of the world then that means we aren't intersecting into any objects yet so keep accumulating.
+                            if (distanceRay < distanceWorld)
+                            {
+                                //And also keep going if we haven't reached the fullest density just yet.
+                                if (result.a < 1.0f)
+                                {
+                                    //sample the fog color (rgb = color, a = density)
+                                    fixed4 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0));
+
+                                    //accumulate the samples
+                                    result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //this is slightly cheaper
+                                    //result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //uses exponential falloff, looks a little nicer but may not be needed
+                                }
+                            }
+                            else
+                                break; //terminante the ray 
                         }
-                        else
-                            break; //terminante the ray 
+
+                        //keep stepping forward into the scene
+                        raymarch_currentPos += raymarch_rayIncrement * _RaymarchStepSize;
                     }
 
-                    //keep stepping forward into the scene
-                    raymarch_currentPos += raymarch_rayIncrement * _RaymarchStepSize;
-                }
+                    //clamp the alpha channel otherwise we get blending issues with bright spots
+                    result.a = clamp(result.a, 0.0f, 1.0f);
 
-                //clamp the alpha channel otherwise we get blending issues with bright spots
-                result.a = clamp(result.a, 0.0f, 1.0f);
+#if defined (_HALF_RESOLUTION)
+                    }
+                    return QuadReadLaneAt(result, uint2(0, 0));
+#endif
 
                 //return the final fog color
                 return result;

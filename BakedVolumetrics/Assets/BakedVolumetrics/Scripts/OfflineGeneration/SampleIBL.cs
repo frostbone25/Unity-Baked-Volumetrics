@@ -53,6 +53,7 @@ namespace BakedVolumetrics
                 IBLCamera.backgroundColor = Color.black;
                 //IBLCamera.clearFlags = CameraClearFlags.SolidColor;
                 IBLCamera.clearFlags = CameraClearFlags.Skybox | CameraClearFlags.SolidColor;
+                IBLCamera.allowMSAA = false;
             }
 
             if(IBLView == null)
@@ -65,6 +66,18 @@ namespace BakedVolumetrics
             IBLCompute.SetVector("TextureResolution", new Vector4(sampleResolution, sampleResolution, 0, 0));
             dispatchX = sampleResolution / 8;
             dispatchY = sampleResolution / 8;
+
+            if (IBLComputeResult != null)
+            {
+                IBLComputeResult.Release();
+                IBLComputeResult = null;
+            }
+
+            if (IBLCameraRender != null)
+            {
+                IBLCameraRender.Release();
+                IBLCameraRender = null;
+            }
         }
 
         public Color SampleVolumetricColor(Vector3 probePosition, Vector3 voxelWorldSize)
@@ -93,6 +106,7 @@ namespace BakedVolumetrics
             if (!test_leak)
                 return Color.black;
 
+            /*
             //||||||||||||||||||||||||||||| SETUP RENDERING |||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||| SETUP RENDERING |||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||| SETUP RENDERING |||||||||||||||||||||||||||||
@@ -156,15 +170,55 @@ namespace BakedVolumetrics
             //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
+            */
 
-            return IBLComputeProxy.GetPixelBilinear(0.5f, 0.5f, IBLComputeResult.mipmapCount - 1);
-            //return IBLComputeProxy.GetPixelBilinear(0.5f, 0.5f, IBLComputeResult.mipmapCount - 1) / 6.0f;
+            //||||||||||||||||||||||||||||| SETUP RENDERING |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| SETUP RENDERING |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| SETUP RENDERING |||||||||||||||||||||||||||||
+
+            //set the camera position
+            IBLCamera.transform.position = probePosition;
+
+            //IBLCamera.SetReplacementShader(IBLView, "");
+
+            if (IBLCameraRender == null)
+            {
+                IBLCameraRender = new RenderTexture(sampleResolution, sampleResolution, 0, rtFormat);
+                IBLCameraRender.dimension = TextureDimension.Cube;
+                IBLCameraRender.Create();
+            }
+
+            IBLCamera.targetTexture = IBLCameraRender;
+
+            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| RENDER EACH FACE |||||||||||||||||||||||||||||
+
+            IBLCamera.RenderToCubemap(IBLCameraRender, 63, Camera.MonoOrStereoscopicEye.Mono);
+
+            //RenderTexture equirect = new RenderTexture(IBLCameraRender.width, IBLCameraRender.height, 0, rtFormat);
+            //RenderTexture equirect = new RenderTexture(renderTextureDescriptor);
+            //equirect.dimension = TextureDimension.Cube;
+            //equirect.Create();
+
+            //IBLCameraRender.ConvertToEquirect(equirect, Camera.MonoOrStereoscopicEye.Mono);
+
+            IBLComputeProxy = RenderTextureConverter.ConvertFromRenderTexture2D(IBLCameraRender, textureFormat, true);
+
+            //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| FINAL COLOR |||||||||||||||||||||||||||||
+
+            return IBLComputeProxy.GetPixelBilinear(0.5f, 0.5f, IBLCameraRender.mipmapCount - 1);
         }
 
         public void Cleanup()
         {
-            IBLComputeResult.Release();
-            IBLCameraRender.Release();
+            if(IBLComputeResult != null)
+                IBLComputeResult.Release();
+
+            if(IBLCameraRender != null)
+                IBLCameraRender.Release();
 
             if (IBLComputeProxy != null)
             {
@@ -177,6 +231,9 @@ namespace BakedVolumetrics
                 DestroyImmediate(IBLCamera.gameObject);
                 IBLCamera = null;
             }
+
+            IBLComputeResult = null;
+            IBLCameraRender = null;
         }
     }
 }

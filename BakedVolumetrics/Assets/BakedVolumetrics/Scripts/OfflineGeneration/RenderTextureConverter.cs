@@ -5,6 +5,7 @@ using UnityEngine.Rendering;
 using UnityEngine;
 using UnityEditor;
 using System.IO;
+using System;
 
 namespace BakedVolumetrics
 {
@@ -118,22 +119,18 @@ namespace BakedVolumetrics
             }
 
             Texture3D output = new Texture3D(rt.width, rt.height, rt.volumeDepth, assetFormat, false);
+            Color[] outputColors = new Color[rt.width * rt.height * rt.volumeDepth];
 
             for (int z = 0; z < rt.volumeDepth; z++)
             {
                 Texture2D slice = finalSlices[z];
+                Color[] sliceColors = slice.GetPixels();
 
-                for (int x = 0; x < rt.width; x++)
-                {
-                    for (int y = 0; y < rt.height; y++)
-                    {
-                        Color singleColor = slice.GetPixel(x, y);
-
-                        output.SetPixel(x, y, z, singleColor);
-                    }
-                }
+                int startIndex = z * rt.width * rt.height;
+                Array.Copy(sliceColors, 0, outputColors, startIndex, rt.width * rt.height);
             }
 
+            output.SetPixels(outputColors);
             output.Apply();
 
             return output;
