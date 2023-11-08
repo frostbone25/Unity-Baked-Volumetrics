@@ -81,14 +81,15 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 
 ## Future Plans/Ideas
 
-- **POST PROCESSING:** Use interleaved rendering.
-- **POST PROCESSING:** Use temporal filtering in-conjunction with animated noise to accumulate samples over multiple frames.
-- **POST PROCESSING:** Using a froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
+- **POST PROCESSING:** interleaved rendering.
+- **POST PROCESSING:** temporal filtering in-conjunction with animated noise to accumulate samples over multiple frames.
+- **POST PROCESSING:** froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
 - **OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading (using the unity jobs system).
 - **OFFLINE VOLUME GENERATION:** With improved cpu raytraced performance, calculations for doing bounce lighting.
 - **OFFLINE VOLUME GENERATION:** Add emissive lighting support for CPU raytracer.
 - **EDITOR:** Previewing Voxels is really really slow at low density values, need to come up with a different way to preview the different voxels.
 - **EDITOR:** Add a context menu item in the scene hiearchy to create a volume.
+- **EDITOR:** Add an option to generate a light probe group that matches the density of the volume when sampling from light probes.
 
 ### Credits
 
