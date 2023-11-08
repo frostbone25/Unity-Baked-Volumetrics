@@ -40,7 +40,7 @@ Overview: This is basically lightmapping but for volumetric fog.
 
 To start you define a box volume within your scene, setting where its located, and it's bounds. You then resolution of the 3D texture by determining the size of the indivudal voxels, or you can set a custom resolution by hand. Next you can choose to either sample lighting from the scene light probes, or a custom raytracer, or both *(each have their advantages and drawbacks)*. After that there is an option to set the fog density of the volume *(constant, luminance, height based, etc.)* The next step is to generate a 3D texture that is saved into the disk. 
 
-For the shader, what we do is sample that 3D texture and perform a raymarch through it, checking it against the scene depth buffer. The ray terminates if: it intersects with the scene, is out of bounds, or if the density is too thick. The result is then lerped with the scene color buffer based on transmittance.
+For the shader, what we do is sample that 3D texture and perform a raymarch through it, checking it against the scene depth buffer. The ray terminates if: it intersects with the scene, is out of bounds, or if the density is too thick. While raymarching also we jitter the samples to improve the quality. The final result is then lerped with the scene color buffer based on transmittance.
 
 ## Multiple Implementations
 
@@ -81,19 +81,18 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 
 ## Future Plans/Ideas
 
-- **GENERAL:** Add option for animated noise.
-- **GENERAL:** Look for ways to interpolate between samples to reduce noise.
 - **POST PROCESSING:** Use interleaved rendering.
 - **POST PROCESSING:** Use temporal filtering in-conjunction with animated noise to accumulate samples over multiple frames.
 - **POST PROCESSING:** Using a froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
-- **OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading.
+- **OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading (using the unity jobs system).
+- **OFFLINE VOLUME GENERATION:** With improved cpu raytraced performance, calculations for doing bounce lighting.
+- **OFFLINE VOLUME GENERATION:** Add emissive lighting support for CPU raytracer.
 - **OFFLINE VOLUME GENERATION:** Create a custom pathtraced/raytraced solution that voxelizes the scene within the volume and traces against it rather than relying on scene light probes which can be low quality and dependent on user placement (Could also be potentially faster than the current CPU only implemntation of the raytracer?).
-- **OFFLINE VOLUME GENERATION:** Save the raw sample results, so that if the user wishes to apply post adjustments they can do so without needing to resample the scene again which can take a long time.
 - **EDITOR:** Previewing Voxels is really really slow at low density values, need to come up with a different way to preview the different voxels.
 - **EDITOR:** Add a context menu item in the scene hiearchy to create a volume.
 
 ### Credits
 
 - **[orels1](https://github.com/orels1)**: Improved VRC support.
-- **[s-ilent](https://github.com/s-ilent)**: Improved noise and using bluenoise instead on their [fork of this repo](https://github.com/s-ilent/Unity-Baked-Volumetrics).
+- **[s-ilent](https://github.com/s-ilent)**: Improved noise by utilizing bluenoise on their [fork of this repo](https://github.com/s-ilent/Unity-Baked-Volumetrics).
 - **[Christoph Peters](http://momentsingraphics.de/BlueNoise.html)**: Free blue noise textures.
