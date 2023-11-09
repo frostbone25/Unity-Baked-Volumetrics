@@ -1,8 +1,6 @@
 # Unity Baked Volumetrics
 A **work in progress** graphics solution for completely baked volumetric lighting, meant to be very lightweight and inexpensive for VR *(and non-vr)*. 
 
-***More details will be revealed but it's very much a work in progress...***
-
 # Results
 ![sponza1](GithubContent/sponza1.jpg)
 
@@ -27,20 +25,22 @@ A **work in progress** graphics solution for completely baked volumetric lightin
 Overview: This is basically lightmapping but for volumetric fog. 
 
 - Completely baked volumetric lighting designed to be lightweight and fast at runtime, and it's baked completely offline in-editor.
-- Volumetric lighting can be generated from multiple sources. (Light Probes, CPU raytacer, *Experimental:* Voxelized GPU raytracer, *Experimental:* IBL) 
+- Volumetric lighting can be generated from multiple sources. (Light Probes, CPU raytacer, *W.I.P:* Voxelized GPU raytracer, *Experimental:* IBL) 
 - Density is baked into the 3d texture (RGB: Color A: Density) and different density types can be used for different looks. (Constant, Luminance Based, Height Based, Luminance Height Based).
-- Post Adjustments can be applied to tweak and improve the look of the generated volume (Brightness, Contrast, Saturation, Vibrance, Hue Shift, Gamma, Color Filter, Color Multiplication, and seperable Gaussian Blur).
+- Post Adjustments can be applied to tweak and improve the look of the generated volume such as Seperable 3D Gaussian Blur for improved quality/smoothness, and more artistic controls like Brightness, Contrast, Saturation, Vibrance, Hue Shift, Gamma, Color Filter, Color Multiplication.
 - Multiple versions of the same effect to suit different needs... (A scene based version, and multiple post process versions)
 
-**NOTE: Constructed on the Built-In Rendering Pipeline.**
+**NOTE: Constructed on the Built-In Rendering Pipeline (But can be adapted to work with other SRPs).**
 
 # Information
 
 ## How it works
 
-To start you define a box volume within your scene, setting where its located, and it's bounds. You then resolution of the 3D texture by determining the size of the indivudal voxels, or you can set a custom resolution by hand. Next you can choose to either sample lighting from the scene light probes, or a custom raytracer, or both *(each have their advantages and drawbacks)*. After that there is an option to set the fog density of the volume *(constant, luminance, height based, etc.)* The next step is to generate a 3D texture that is saved into the disk. 
+To start you define a box volume within your scene, setting where its located, and it's bounds. The resolution of the 3D texture is computed by determining the size of the indivudal voxels *(You can also set a custom resolution by hand)*. Next you can choose to either sample lighting from the scene light probes, or a custom raytracer. After that there is an option to set the fog density of the volume *(constant, luminance, height based, etc.)* The next step is to generate a 3D texture that is saved into the disk. 
 
 For the shader, what we do is sample that 3D texture and perform a raymarch through it, checking it against the scene depth buffer. The ray terminates if: it intersects with the scene, is out of bounds, or if the density is too thick. While raymarching also we jitter the samples to improve the quality. The final result is then lerped with the scene color buffer based on transmittance.
+
+NOTE: When sampling lighting, at the time of writing I **HIGHLY RECCOMEND** you sample from light probes rather than from the raytracers. The raytracers implemented are in various states of completion and don't fully work yet, and also miss out on features like bounce and indirect lighting. With light probes however these features are inherent to it as they are sampled directly from the unity lightmapper. I recomend setting up a light probe group in a grid like fashion within the bounds of a given volume, with a matching density for the best results. The screenshots shown here are taken with the light probe method.
 
 ## Multiple Implementations
 
@@ -81,18 +81,20 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 
 ## Future Plans/Ideas
 
-- **POST PROCESSING:** Use interleaved rendering.
-- **POST PROCESSING:** Use temporal filtering in-conjunction with animated noise to accumulate samples over multiple frames.
-- **POST PROCESSING:** Using a froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
+- **POST PROCESSING:** interleaved rendering.
+- **POST PROCESSING:** temporal filtering in-conjunction with animated noise to accumulate samples over multiple frames.
+- **POST PROCESSING:** froxel solution to intersect multiple volumes in a scene, so we can raymarch only once rather than raymarch for each volume in the scene which would be dumb. This also allows the abillity to have multiple volumes in the scene in an efficent way for the post processing solution.
 - **OFFLINE VOLUME GENERATION:** Improve the cpu raytraced volume speed by multithreading (using the unity jobs system).
 - **OFFLINE VOLUME GENERATION:** With improved cpu raytraced performance, calculations for doing bounce lighting.
 - **OFFLINE VOLUME GENERATION:** Add emissive lighting support for CPU raytracer.
-- **OFFLINE VOLUME GENERATION:** Create a custom pathtraced/raytraced solution that voxelizes the scene within the volume and traces against it rather than relying on scene light probes which can be low quality and dependent on user placement (Could also be potentially faster than the current CPU only implemntation of the raytracer?).
 - **EDITOR:** Previewing Voxels is really really slow at low density values, need to come up with a different way to preview the different voxels.
 - **EDITOR:** Add a context menu item in the scene hiearchy to create a volume.
+- **EDITOR:** Add an option to generate a light probe group that matches the density of the volume when sampling from light probes.
 
 ### Credits
 
 - **[orels1](https://github.com/orels1)**: Improved VRC support.
 - **[s-ilent](https://github.com/s-ilent)**: Improved noise by utilizing bluenoise on their [fork of this repo](https://github.com/s-ilent/Unity-Baked-Volumetrics).
 - **[Christoph Peters](http://momentsingraphics.de/BlueNoise.html)**: Free blue noise textures.
+- **[pema99](https://gist.github.com/pema99)**: [Quad Intrinsics](https://gist.github.com/pema99/9585ca31e31ea8b5bd630171d76b6f3a) library which allows room for additional optimizations.
+- 
