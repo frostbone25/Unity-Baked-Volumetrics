@@ -9,7 +9,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: SceneVolume
   m_Shader: {fileID: 4800000, guid: 4c531454e78090b41bad275f01555477, type: 3}
-  m_ShaderKeywords: ANIMATED_NOISE SAMPLES_32 _SAMPLES__16 _SKIPPIXELS_ONE _SKIPPIXELS_ONE_PIXEL
+  m_ShaderKeywords: ANIMATED_NOISE SAMPLES_16 _SAMPLES__16 _SKIPPIXELS_ONE _SKIPPIXELS_ONE_PIXEL
     ___8
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0

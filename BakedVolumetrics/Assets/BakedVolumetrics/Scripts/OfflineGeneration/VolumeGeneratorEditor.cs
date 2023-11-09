@@ -34,8 +34,11 @@ namespace BakedVolumetrics
         SerializedProperty densityTop;
         SerializedProperty densityBottom;
         SerializedProperty densityInvertLuminance;
+        SerializedProperty volumeLightProbeGroupDensityMultiplier;
 
         VolumeGenerator scriptObject;
+
+        private GUIStyle errorStyle;
 
         void OnEnable()
         {
@@ -60,10 +63,24 @@ namespace BakedVolumetrics
             densityTop = serializedObject.FindProperty("densityTop");
             densityBottom = serializedObject.FindProperty("densityBottom");
             densityInvertLuminance = serializedObject.FindProperty("densityInvertLuminance");
+            volumeLightProbeGroupDensityMultiplier = serializedObject.FindProperty("volumeLightProbeGroupDensityMultiplier");
         }
 
         public override void OnInspectorGUI()
         {
+            errorStyle = new GUIStyle(EditorStyles.helpBox);
+            errorStyle.normal.background = new Texture2D(2, 2);
+            
+            for(int x = 0; x < errorStyle.normal.background.width; x++)
+            {
+                for (int y = 0; y < errorStyle.normal.background.height; y++)
+                {
+                    errorStyle.normal.background.SetPixel(x, y, Color.red);
+                }
+            }
+
+            errorStyle.normal.textColor = Color.red;
+
             serializedObject.Update();
 
             scriptObject = serializedObject.targetObject as VolumeGenerator;
@@ -113,6 +130,16 @@ namespace BakedVolumetrics
             if(lightingSourceValue == LightingSource.LightProbes)
             {
                 EditorGUILayout.LabelField("NOTE: The resolution of the final bake is dependent on how dense your light probe groups are. If your probe groups are sparse populated but you're generating at a high resolution volume then you won't get any sharper results and will just be wasting memory/vram/disk space. If you want sharper results consider using a different lighting source.", EditorStyles.helpBox);
+
+                if(scriptObject.CheckForLightProbes())
+                    EditorGUILayout.LabelField("There is no active light probe group in the scene! Either build one for your scene, or we can generate one based on the bounds of this volume. Make sure you generate lighting for the scene so that they are being used.", errorStyle);
+
+                EditorGUILayout.PropertyField(volumeLightProbeGroupDensityMultiplier);
+
+                if (GUILayout.Button("Generate Light Probe Group"))
+                {
+                    scriptObject.GenerateLightProbeGroup();
+                }
             }
 
             //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||

@@ -66,6 +66,8 @@ namespace BakedVolumetrics
         private Material fogMaterial;
         private Vector3Int volumeResolution;
         private Texture3D volumeTexture;
+        private LightProbeGroup volumeLightProbeGroup;
+        public float volumeLightProbeGroupDensityMultiplier = 0.5f;
 
         private static string sceneStaticCollidersName = "TEMP_SceneStaticColliders";
         private GameObject sceneStaticColliders;
@@ -565,6 +567,61 @@ namespace BakedVolumetrics
                 default:
                     return RenderTextureFormat.ARGBHalf;
             }
+        }
+
+        public void GenerateLightProbeGroup()
+        {
+            volumeLightProbeGroup = transform.GetComponentInChildren<LightProbeGroup>();
+
+            if (volumeLightProbeGroup == null)
+            {
+                GameObject newGameObject = new GameObject("Volume Light Probe Group");
+
+                newGameObject.transform.SetParent(transform);
+                newGameObject.transform.localPosition = Vector3.zero;
+
+                volumeLightProbeGroup = newGameObject.AddComponent<LightProbeGroup>();
+            }
+
+            List<Vector3> probePositions = new List<Vector3>();
+
+            Vector3Int modifiedVolumeResolution = volumeResolution;
+            modifiedVolumeResolution.x = (int)((float)modifiedVolumeResolution.x * volumeLightProbeGroupDensityMultiplier);
+            modifiedVolumeResolution.y = (int)((float)modifiedVolumeResolution.y * volumeLightProbeGroupDensityMultiplier);
+            modifiedVolumeResolution.z = (int)((float)modifiedVolumeResolution.z * volumeLightProbeGroupDensityMultiplier);
+
+            //3d loop for our volume
+            for (int x = -modifiedVolumeResolution.x / 2; x <= modifiedVolumeResolution.x / 2; x++)
+            {
+                //get the x offset
+                float x_offset = volumeSize.x / modifiedVolumeResolution.x;
+
+                for (int y = -modifiedVolumeResolution.y / 2; y <= modifiedVolumeResolution.y / 2; y++)
+                {
+                    //get the y offset
+                    float y_offset = volumeSize.y / modifiedVolumeResolution.y;
+
+                    for (int z = -modifiedVolumeResolution.z / 2; z <= modifiedVolumeResolution.z / 2; z++)
+                    {
+                        //get the z offset
+                        float z_offset = volumeSize.z / modifiedVolumeResolution.z;
+
+                        //Vector3 probePosition = new Vector3(transform.position.x + (x * x_offset), transform.position.y + (y * y_offset), transform.position.z + (z * z_offset));
+                        Vector3 probePosition = new Vector3(x * x_offset, y * y_offset, z * z_offset);
+
+                        probePositions.Add(probePosition);
+                    }
+                }
+            }
+
+            volumeLightProbeGroup.probePositions = probePositions.ToArray();
+        }
+
+        public bool CheckForLightProbes()
+        {
+            LightProbeGroup[] existingGroups = FindObjectsOfType<LightProbeGroup>();
+
+            return existingGroups == null || existingGroups.Length < 1;
         }
 
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| GIZMOS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
