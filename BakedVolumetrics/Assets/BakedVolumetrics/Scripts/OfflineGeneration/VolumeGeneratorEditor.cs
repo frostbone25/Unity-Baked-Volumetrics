@@ -21,7 +21,6 @@ namespace BakedVolumetrics
         SerializedProperty voxelDensitySize;
         SerializedProperty previewBounds;
         SerializedProperty previewVoxels;
-        SerializedProperty combineColorType;
         SerializedProperty additiveLightprobeIntensity;
         SerializedProperty additiveRaytracedIntensity;
         SerializedProperty lerpFactor;
@@ -51,7 +50,6 @@ namespace BakedVolumetrics
             previewBounds = serializedObject.FindProperty("previewBounds");
             previewVoxels = serializedObject.FindProperty("previewVoxels");
             raymarchSamples = serializedObject.FindProperty("raymarchSamples");
-            combineColorType = serializedObject.FindProperty("combineColorType");
             additiveLightprobeIntensity = serializedObject.FindProperty("additiveLightprobeIntensity");
             additiveRaytracedIntensity = serializedObject.FindProperty("additiveRaytracedIntensity");
             lerpFactor = serializedObject.FindProperty("lerpFactor");

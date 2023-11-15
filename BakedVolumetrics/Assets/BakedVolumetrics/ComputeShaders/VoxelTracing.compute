@@ -58,6 +58,9 @@ float3 VolumePosition;
 float3 VolumeSize;
 float3 VolumeResolution;
 
+int Samples;
+int Bounces;
+
 float4 TEX2D_SHARP(Texture2D<float4> tex, float2 uv)
 {
     return tex.SampleLevel(_PointClamp, uv, 0);
@@ -78,11 +81,36 @@ float4 TEX3D(Texture3D<float4> tex, float3 position)
     return tex.SampleLevel(_LinearClamp, position, 0);
 }
 
+float hash(float2 p)  // replace this by something better
+{
+    p = 50.0 * frac(p * 0.3183099 + float2(0.71, 0.113));
+    return -1.0 + 2.0 * frac(p.x * p.y * (p.x + p.y));
+}
+
+float rand(float co) 
+{ 
+    return frac(sin(co * (91.3458)) * 47453.5453); 
+}
+
+float rand(float2 co) 
+{ 
+    return frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453); 
+}
+
+float rand(float3 co) 
+{ 
+    return rand(co.xy + rand(co.z)); 
+}
+
+float3 GetRandomDirection(float3 direction)
+{
+    return float3(rand(direction.x), rand(direction.y), rand(direction.z));
+}
+
 float CalculateAttenuation(float distanceToSource)
 {
     //return 1.0f / (distanceToSource * distanceToSource); //inverse square falloff
     return 1.0f / distanceToSource; //linear falloff;
-
     //return 1.0f / pow(distanceToSource, 4.0);
 }
 
@@ -107,9 +135,44 @@ float3 EstimateSurfaceNormal(float3 texCoord)
     return normal;
 }
 
-#pragma kernel CSMain
+#pragma kernel CSTracerV2
 [numthreads(8,8,8)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+void CSTracerV2(uint3 id : SV_DispatchThreadID)
+{
+    int pi = 3.14159;
+    float3 voxelPosition = id.xyz + float3(0.5, 0.5, 0.5);
+    voxelPosition /= VolumeResolution.xyz;
+
+    float3 singleVoxelSize = VolumeSize / VolumeResolution;
+
+    float3 worldVoxelPosition = VolumePosition + (voxelPosition * VolumeSize) - (VolumeSize / 2.0);
+
+    //buffers
+    float4 sceneAlbedo = TEX3D_SHARP(SceneAlbedo, voxelPosition);
+    float4 sceneEmissive = TEX3D_SHARP(SceneEmissive, voxelPosition);
+    float4 scenePosition = TEX3D_SHARP(ScenePosition, voxelPosition);
+
+    //trace lights
+    //float4 finalColor = float4(0, 0, 0, sceneAlbedo.a);
+    float4 finalColor = float4(0, 0, 0, 1);
+
+    for (int i = 0; i < Samples; i++)
+    {
+        float3 rayPosition = voxelPosition;
+        float3 rayDirection = GetRandomDirection(rayPosition * i);
+        rayDirection *= singleVoxelSize;
+
+
+    }
+
+    finalColor = max(0.0f, finalColor);
+
+    Write[id.xyz] = finalColor;
+}
+
+#pragma kernel CSTracerV1
+[numthreads(8, 8, 8)]
+void CSTracerV1(uint3 id : SV_DispatchThreadID)
 {
     int pi = 3.14159;
     float3 voxelPosition = id.xyz + float3(0.5, 0.5, 0.5);
@@ -241,7 +304,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     //|||||||||||||||||||||||||||||||||||| AREA LIGHTS ||||||||||||||||||||||||||||||||||||
     if (AreaLightsExist)
     {
-        /*
         for (int z = 0; z < AreaLights.Length; z++)
         {
             LightArea areaLight = AreaLights[z];
@@ -250,10 +312,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
             float3 areaLightRight = areaLight.lightRightDirection;
             float3 areaLightUp = areaLight.lightUpwardDirection;
 
-            //int areaWidthSamples = areaLightSize.x / singleVoxelSize.x;
-            //int areaHeightSamples = areaLightSize.y / singleVoxelSize.y;
-            //int areaWidthSamples = areaLightSize.x / length(singleVoxelSize);
-            //int areaHeightSamples = areaLightSize.y / length(singleVoxelSize);
             int areaWidthSamples = areaLightSize.x / min(min(singleVoxelSize.x, singleVoxelSize.y), singleVoxelSize.z);
             int areaHeightSamples = areaLightSize.y / min(min(singleVoxelSize.x, singleVoxelSize.y), singleVoxelSize.z);
 
@@ -283,52 +341,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
                         float3 areaLight_hitPosition = float3(0, 0, 0);
                         float3 areaLight_hitNormal = float3(0, 1, 0);
                         float3 areaLight_hitAlbedo = float3(1, 1, 1);
-
-                        while (distance(areaLight_currentRayPosition, areaLightSamplePosition) > 0.5f)
-                        {
-                            float3 areaLight_scaledRayPosition = ((areaLight_currentRayPosition + (VolumeSize / 2.0)) - VolumePosition) / VolumeSize;
-                            float4 areaLight_sceneAlbedoSample = TEX3D_SHARP(SceneAlbedo, areaLight_scaledRayPosition);
-
-                            if (areaLight_sceneAlbedoSample.a > 0.0)
-                            {
-                                areaLight_isOccluded = true;
-                                break;
-                            }
-
-                            //keep stepping the ray in world space
-                            areaLight_currentRayPosition += areaLight_currentRayDirection / length(VolumeResolution);
-                        }
-
-                        if (areaLight_isOccluded == false)
-                        {
-                            finalColor.rgb += areaLightColorSample * areaLightDistanceSample;
-                        }
                     }
                 }
             }
         }
-        */
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     finalColor = max(0.0f, finalColor);
 

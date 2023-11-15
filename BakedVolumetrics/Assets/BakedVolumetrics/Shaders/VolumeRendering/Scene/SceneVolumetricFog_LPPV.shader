@@ -1,12 +1,11 @@
-﻿Shader "SceneVolumetricFog"
+﻿//References
+//UnityCG.cginc - https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityCG.cginc
+//UnityShaderVariables.cginc - https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityShaderVariables.cginc
+
+Shader "SceneVolumetricFog_LPPV"
 {
     Properties
     {
-        [Header(Volume)]
-        _VolumeTexture("Volume Texture", 3D) = "white" {}
-        _VolumePos("Volume World Position", Vector) = (0, 0, 0, 0)
-        _VolumeSize("Volume World Size", Vector) = (0, 0, 0, 0)
-
         [Header(Raymarching)]
         _RaymarchStepSize("Raymarch Step Size", Float) = 25
 
@@ -115,12 +114,9 @@
 
             fixed _RaymarchStepSize;
             fixed _RaymarchJitterStrength;
-            fixed4 _VolumePos;
-            fixed4 _VolumeSize;
             fixed4 _JitterTexture_TexelSize;
             fixed4 _CameraDepthTexture_TexelSize;
             sampler2D_half _JitterTexture;
-            sampler3D_half _VolumeTexture;
             UNITY_DECLARE_SCREENSPACE_TEXTURE(_CameraDepthTexture);
 
             #if defined (_ANIMATED_NOISE)
@@ -193,6 +189,7 @@
                 //get our screen uv coords
                 fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
 
+
                 #if UNITY_UV_STARTS_AT_TOP
                     if (_CameraDepthTexture_TexelSize.y < 0)
                         screenUV.y = 1 - screenUV.y;
@@ -214,9 +211,8 @@
                 //get the world position vector
                 fixed3 worldPos = cameraWorldPositionViewPlane * linearDepth + _WorldSpaceCameraPos;
 
-                //scale our vectors to the volume
-                fixed3 scaledWorldPos = ((worldPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
-                fixed3 scaledCameraPos = ((_WorldSpaceCameraPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
+                const fixed transformToLocal = unity_ProbeVolumeParams.y;
+                const fixed texelSizeX = unity_ProbeVolumeParams.z;
 
                 // UV offset by orientation
                 fixed3 localViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
@@ -237,32 +233,58 @@
                 //get our starting ray position from the camera
                 fixed3 raymarch_currentPos = _WorldSpaceCameraPos + raymarch_rayIncrement * jitter;
 
+                //float3 unity_ProbeVolumeSizeInv; float3 unity_ProbeVolumeMin; float4x4 unity_ProbeVolumeWorldToObject;
+
                 //start marching
+                [unroll(_RaymarchSteps)]
                 for (int i = 0; i < _RaymarchSteps; i++)
                 {
-                    //scale the current ray position to be within the volume
-                    fixed3 scaledPos = ((raymarch_currentPos - _VolumePos) + _VolumeSize * 0.5) / _VolumeSize;
-
                     //get the distances of the ray and the world position
-                    fixed distanceRay = distance(scaledCameraPos, scaledPos);
-                    fixed distanceWorld = distance(scaledCameraPos, scaledWorldPos);
+                    fixed distanceRay = distance(_WorldSpaceCameraPos, raymarch_currentPos);
+                    fixed distanceWorld = distance(_WorldSpaceCameraPos, worldPos);
 
                     //make sure we are within our little box
-                    if (scaledPos.x < 1.0f && scaledPos.x > 0.0f && scaledPos.y < 1.0f && scaledPos.y > 0.0f && scaledPos.z < 1.0f && scaledPos.z > 0.0f)
+                    //if (scaledPos.x < 1.0f && scaledPos.x > 0.0f && scaledPos.y < 1.0f && scaledPos.y > 0.0f && scaledPos.z < 1.0f && scaledPos.z > 0.0f)
+                        
+                    //IMPORTANT: Check the current position distance of our ray compared to where we started.
+                    //If our distance is less than that of the world then that means we aren't intersecting into any objects yet so keep accumulating.
+                    if (distanceRay < distanceWorld)
                     {
-                        //IMPORTANT: Check the current position distance of our ray compared to where we started.
-                        //If our distance is less than that of the world then that means we aren't intersecting into any objects yet so keep accumulating.
-                        if (distanceRay < distanceWorld)
+                        //And also keep going if we haven't reached the fullest density just yet.
+                        if (result.a < 1.0f)
                         {
-                            //And also keep going if we haven't reached the fullest density just yet.
-                            if (result.a < 1.0f)
-                            {
-                                //sample the fog color (rgb = color, a = density)
-                                fixed4 sampledColor = tex3Dlod(_VolumeTexture, fixed4(scaledPos, 0));
+                            //sample the fog color (rgb = color, a = density)
 
-                                //accumulate the samples
-                                result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //this is slightly cheaper
-                            }
+                            //The SH coefficients textures and probe occlusion are packed into 1 atlas.
+                            //-------------------------
+                            //| ShR | ShG | ShB | Occ |
+                            //-------------------------
+
+                            fixed3 position = (transformToLocal == 1.0f) ? mul(unity_ProbeVolumeWorldToObject, fixed4(raymarch_currentPos, 1.0)).xyz : raymarch_currentPos;
+                            fixed3 texCoord = (position - unity_ProbeVolumeMin.xyz) * unity_ProbeVolumeSizeInv.xyz;
+                            texCoord.x = texCoord.x * 0.25f;
+
+                            // We need to compute proper X coordinate to sample.
+                            // Clamp the coordinate otherwize we'll have leaking between RGB coefficients
+                            fixed texCoordX = clamp(texCoord.x, 0.5f * texelSizeX, 0.25f - 0.5f * texelSizeX);
+
+                            // sampler state comes from SHr (all SH textures share the same sampler)
+                            texCoord.x = texCoordX;
+                            fixed4 sphericalHarmonics_A_R = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, texCoord);
+
+                            texCoord.x = texCoordX + 0.25f;
+                            fixed4 sphericalHarmonics_A_G = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, texCoord);
+
+                            texCoord.x = texCoordX + 0.5f;
+                            fixed4 sphericalHarmonics_A_B = UNITY_SAMPLE_TEX3D_SAMPLER(unity_ProbeVolumeSH, unity_ProbeVolumeSH, texCoord);
+
+                            // Linear + constant polynomial terms
+                            fixed3 dotDirection = fixed3(0, 1, 0);
+                            fixed3 sampledColor = fixed3(dot(sphericalHarmonics_A_R, dotDirection), dot(sphericalHarmonics_A_G, dotDirection), dot(sphericalHarmonics_A_B, dotDirection));
+                            sampledColor = max(0.0, sampledColor);
+
+                            //accumulate the samples
+                            result += fixed4(sampledColor.rgb, 1.0f) * stepLength; //this is slightly cheaper                                    
                         }
                         else
                             break; //terminante the ray 

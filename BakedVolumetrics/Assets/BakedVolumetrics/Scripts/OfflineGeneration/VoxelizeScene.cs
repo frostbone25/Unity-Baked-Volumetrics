@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Runtime.InteropServices.ComTypes;
-using Unity.Mathematics;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -31,6 +30,8 @@ namespace BakedVolumetrics
         [Header("Baking Options")]
         public bool enableAnitAliasing = false;
         public bool blendVoxelResult = false;
+        public int samples = 32;
+        public int bounces = 2;
 
         [Header("Bakes")]
         public bool bakeAlbedo = true;
@@ -238,7 +239,8 @@ namespace BakedVolumetrics
             //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER ||||||||||||||||||||||||||||||||||||||||||
             //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER ||||||||||||||||||||||||||||||||||||||||||
 
-            int compute_main = voxelize.FindKernel("CSMain");
+            //int compute_main = voxelize.FindKernel("CSTracerV1");
+            int compute_main = voxelize.FindKernel("CSTracerV2");
 
             voxelize.SetVector("VolumeResolution", new Vector4(voxelResolution.x, voxelResolution.y, voxelResolution.z, 0));
 
@@ -264,6 +266,9 @@ namespace BakedVolumetrics
 
             voxelize.SetVector("VolumePosition", transform.position);
             voxelize.SetVector("VolumeSize", voxelSize);
+
+            voxelize.SetInt("Samples", samples);
+            voxelize.SetInt("Bounces", bounces);
 
             //voxelize.Dispatch(compute_main, voxelResolution.x, voxelResolution.y, voxelResolution.z);
             voxelize.Dispatch(compute_main, Mathf.CeilToInt(voxelResolution.x / 8f), Mathf.CeilToInt(voxelResolution.y / 8f), Mathf.CeilToInt(voxelResolution.z / 8f));

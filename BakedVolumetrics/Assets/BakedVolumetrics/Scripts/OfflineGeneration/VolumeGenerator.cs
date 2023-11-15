@@ -9,12 +9,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
-using Unity.Jobs;
-using UnityEditor.Profiling;
 using UnityEngine.Profiling;
-using Unity.Collections;
-using UnityEngine.UIElements;
-using static BakedVolumetrics.SampleCPURaytrace;
 
 namespace BakedVolumetrics
 {
@@ -29,7 +24,6 @@ namespace BakedVolumetrics
         }
 
         public LightingSource lightingSource = LightingSource.LightProbes;
-        public CombineColorType combineColorType = CombineColorType.Additive;
         public float additiveLightprobeIntensity = 1.0f;
         public float additiveRaytracedIntensity = 1.0f;
         public float lerpFactor = 0.5f;
