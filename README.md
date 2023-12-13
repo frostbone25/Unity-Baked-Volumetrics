@@ -25,7 +25,7 @@ A **work in progress** graphics solution for completely baked volumetric lightin
 Overview: This is basically lightmapping but for volumetric fog. 
 
 - Completely baked volumetric lighting designed to be lightweight and fast at runtime, and it's baked completely offline in-editor.
-- Volumetric lighting can be generated from multiple sources. (Light Probes, CPU raytacer, *W.I.P:* Voxelized GPU raytracer, *Experimental:* IBL) 
+- Volumetric lighting can be generated from multiple sources. (Light Probes, CPU raytacer, *W.I.P:* Voxelized GPU raytracer, *Experimental:* IBL, Light Probe Proxy Volumes) 
 - Density is baked into the 3d texture (RGB: Color A: Density) and different density types can be used for different looks. (Constant, Luminance Based, Height Based, Luminance Height Based).
 - Post Adjustments can be applied to tweak and improve the look of the generated volume such as Seperable 3D Gaussian Blur for improved quality/smoothness, and more artistic controls like Brightness, Contrast, Saturation, Vibrance, Hue Shift, Gamma, Color Filter, Color Multiplication.
 - Multiple versions of the same effect to suit different needs... (A scene based version, and multiple post process versions)
@@ -36,7 +36,7 @@ Overview: This is basically lightmapping but for volumetric fog.
 
 ## How it works
 
-To start you define a box volume within your scene, setting where its located, and it's bounds. The resolution of the 3D texture is computed by determining the size of the indivudal voxels *(You can also set a custom resolution by hand)*. Next you can choose to either sample lighting from the scene light probes, or a custom raytracer. After that there is an option to set the fog density of the volume *(constant, luminance, height based, etc.)* The next step is to generate a 3D texture that is saved into the disk. 
+To start you define a box volume within your scene, setting where its located, and it's bounds. The resolution of the 3D texture is computed by determining the size of the individual voxels *(You can also set a custom resolution by hand)*. Next you can choose to either sample lighting from the scene light probes, or a custom raytracer. After that there is an option to set the fog density of the volume *(constant, luminance, height based, etc.)* The next step is to generate a 3D texture that is saved into the disk. 
 
 For the shader, what we do is sample that 3D texture and perform a raymarch through it, checking it against the scene depth buffer. The ray terminates if: it intersects with the scene, is out of bounds, or if the density is too thick. While raymarching also we jitter the samples to improve the quality. The final result is then lerped with the scene color buffer based on transmittance.
 
@@ -78,6 +78,7 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 - For the Post Processing V1/V2 implementations you cannot stack multiple volumes. (This should be solved in the future with a newer implementation that utilizes a froxel)
 - Sampling from the CPU raytracer is very slow, it's a basic implementation and it requires colliders in order to work properly.
 - For Post Processing V1/V2 and Scene Based implementations, low raymarch samples (or high raymarch distances) can lead to very noisy results.
+- For Scene based variant that samples lighting from a Light Probe Proxy Volume, there is no pre-processing that can be done to filter the volume at runtime efficiently so if the LPPV is at a low resolution the results can look very blocky/coarse.
 
 ## Future Plans/Ideas
 
@@ -97,4 +98,4 @@ This REQUIRES camera depth generation enabled. This works automatically for defe
 - **[s-ilent](https://github.com/s-ilent)**: Improved noise by utilizing bluenoise on their [fork of this repo](https://github.com/s-ilent/Unity-Baked-Volumetrics).
 - **[Christoph Peters](http://momentsingraphics.de/BlueNoise.html)**: Free blue noise textures.
 - **[pema99](https://gist.github.com/pema99)**: [Quad Intrinsics](https://gist.github.com/pema99/9585ca31e31ea8b5bd630171d76b6f3a) library which allows room for additional optimizations.
-- 
+
