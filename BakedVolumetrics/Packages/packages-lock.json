@@ -183,8 +183,8 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.xr.management": {
-      "version": "4.2.0",
-      "depth": 1,
+      "version": "4.2.1",
+      "depth": 0,
       "source": "registry",
       "dependencies": {
         "com.unity.modules.subsystems": "1.0.0",
@@ -195,8 +195,17 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.unity.xr.mock-hmd": {
+      "version": "1.3.1-preview.1",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.xr.management": "4.0.1"
+      },
+      "url": "https://packages.unity.com"
+    },
     "com.unity.xr.oculus": {
-      "version": "1.12.0",
+      "version": "1.12.1",
       "depth": 0,
       "source": "registry",
       "dependencies": {

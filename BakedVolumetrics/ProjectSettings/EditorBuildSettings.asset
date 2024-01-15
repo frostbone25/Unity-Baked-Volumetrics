@@ -6,10 +6,12 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/RPG_FPS_game_assets_industrial/Map_v1.unity
-    guid: 5a463281e6e238742a45430f11e82829
+    path: Assets/Scenes/VolumetricsScene.unity
+    guid: 26349cabe9d7eae4990c13a839b4f8be
   m_configObjects:
     Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 9e48d247c8154df48a3f17cbd19b777e,
       type: 2}
-    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 32f2362db8621234097807fb85ee926c,
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: b94b43009c5d53740afd45bd9f423033,
+      type: 2}
+    xr.sdk.mock-hmd.settings: {fileID: 11400000, guid: aedf4dd1032c05548bc9ea7bb229f655,
       type: 2}

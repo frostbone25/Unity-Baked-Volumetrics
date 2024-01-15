@@ -1,0 +1,416 @@
+/*
+* Notes for shader macros used in Unity.
+* 
+* Only the ones that are used in the shader... everything else is excluded.
+* But they are noted here because constantly rummaging through the numerous .cginc files
+* to find the references to the used marcos, and to find what they are exactly defined as, and in what conditions exact is a nightmare.
+*
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - UNITY_DECLARE_SCREENSPACE_TEXTURE(tex)
+
+    if(UNITY_STEREO_INSTANCING_ENABLED || UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        #define UNITY_DECLARE_SCREENSPACE_TEXTURE UNITY_DECLARE_TEX2DARRAY
+    }
+    else
+    {
+        #define UNITY_DECLARE_SCREENSPACE_TEXTURE(tex) sampler2D tex;
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - UNITY_DECLARE_TEX2DARRAY(tex)
+
+    #define UNITY_DECLARE_TEX2DARRAY(tex) Texture2DArray tex; SamplerState sampler##tex
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - UNITY_PROJ_COORD(a)
+
+    #define UNITY_PROJ_COORD(a) a
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - UNITY_DECLARE_DEPTH_TEXTURE(tex)
+
+    if(UNITY_STEREO_INSTANCING_ENABLED || UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        #define UNITY_DECLARE_DEPTH_TEXTURE(tex) UNITY_DECLARE_TEX2DARRAY (tex)
+    }
+    else
+    {
+        #define UNITY_DECLARE_DEPTH_TEXTURE(tex) sampler2D_float tex
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - SAMPLE_DEPTH_TEXTURE(sampler, uv)
+
+    if(UNITY_STEREO_INSTANCING_ENABLED || UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        #define SAMPLE_DEPTH_TEXTURE(sampler, uv) UNITY_SAMPLE_TEX2DARRAY(sampler, float3((uv).x, (uv).y, (float)unity_StereoEyeIndex)).r
+    }
+    else
+    {
+        #define SAMPLE_DEPTH_TEXTURE(sampler, uv) (tex2D(sampler, uv).r)
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - UNITY_SAMPLE_TEX2DARRAY(tex, coord)
+
+    #define UNITY_SAMPLE_TEX2DARRAY(tex,coord) tex.Sample (sampler##tex,coord)
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - SAMPLE_DEPTH_TEXTURE_PROJ(sampler, uv)
+
+    if(UNITY_STEREO_INSTANCING_ENABLED || UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        #define SAMPLE_DEPTH_TEXTURE_PROJ(sampler, uv) UNITY_SAMPLE_TEX2DARRAY(sampler, float3((uv).x/(uv).w, (uv).y/(uv).w, (float)unity_StereoEyeIndex)).r
+    }
+    else
+    {
+        #define SAMPLE_DEPTH_TEXTURE_PROJ(sampler, uv) (tex2Dproj(sampler, uv).r)
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - SAMPLE_DEPTH_TEXTURE_LOD(sampler, uv)
+
+    if(UNITY_STEREO_INSTANCING_ENABLED || UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        #define SAMPLE_DEPTH_TEXTURE_LOD(sampler, uv) UNITY_SAMPLE_TEX2DARRAY_LOD(sampler, float3((uv).xy, (float)unity_StereoEyeIndex), (uv).w).r
+    }
+    else
+    {
+        #define SAMPLE_DEPTH_TEXTURE_LOD(sampler, uv) (tex2Dlod(sampler, uv).r)
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc) 
+    Deconstructed - UNITY_SAMPLE_TEX2DARRAY_LOD(tex, coord, lod)
+
+    #define UNITY_SAMPLE_TEX2DARRAY_LOD(tex,coord,lod) tex.SampleLevel (sampler##tex,coord, lod)
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_INSTANCING_BUFFER_START(buf)
+
+    #define UNITY_INSTANCING_BUFFER_START(buf)      UNITY_INSTANCING_CBUFFER_SCOPE_BEGIN(UnityInstancing_##buf) struct {
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_INSTANCING_BUFFER_END(arr)
+
+    #define UNITY_INSTANCING_BUFFER_END(arr)        } arr##Array[UNITY_INSTANCED_ARRAY_SIZE]; UNITY_INSTANCING_CBUFFER_SCOPE_END
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_DEFINE_INSTANCED_PROP(type, var)
+
+    #define UNITY_DEFINE_INSTANCED_PROP(type, var)  type var;
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_ACCESS_INSTANCED_PROP(arr, var)
+
+    #define UNITY_ACCESS_INSTANCED_PROP(arr, var)   arr##Array[unity_InstanceID].var
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityCG.cginc)
+    Deconstructed - ComputeScreenPos(float4 pos) 
+
+    inline float4 ComputeScreenPos(float4 pos) 
+    {
+        float4 o = ComputeNonStereoScreenPos(pos);
+
+        #if defined(UNITY_SINGLE_PASS_STEREO)
+            o.xy = TransformStereoScreenSpaceTex(o.xy, pos.w);
+        #endif
+
+        return o;
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityCG.cginc)
+    Deconstructed - ComputeNonStereoScreenPos(float4 pos)
+
+    inline float4 ComputeNonStereoScreenPos(float4 pos) 
+    {
+        float4 o = pos * 0.5f;
+
+        //_ProjectionParams.x = 1 or -1 (-1 if projection is flipped)
+
+        o.xy = float2(o.x, o.y * _ProjectionParams.x) + o.w;
+        o.zw = pos.zw;
+
+        return o;
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityCG.cginc)
+    Deconstructed - TransformStereoScreenSpaceTex(float2 uv, float w)
+
+    #if defined(UNITY_SINGLE_PASS_STEREO)
+        float2 TransformStereoScreenSpaceTex(float2 uv, float w)
+        {
+            float4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
+            return uv.xy * scaleOffset.xy + scaleOffset.zw * w;
+        }
+    #else
+        #define TransformStereoScreenSpaceTex(uv, w) uv
+    #endif
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityCG.cginc)
+    Deconstructed - UnityStereoTransformScreenSpaceTex(float4 uv)
+
+    #if defined(UNITY_SINGLE_PASS_STEREO)
+        inline float4 UnityStereoTransformScreenSpaceTex(float4 uv)
+        {
+            return float4(UnityStereoTransformScreenSpaceTex(uv.xy), UnityStereoTransformScreenSpaceTex(uv.zw));
+        }
+    #else
+        #define UnityStereoTransformScreenSpaceTex(uv) uv
+    #endif
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityCG.cginc)
+    Deconstructed - UnityStereoTransformScreenSpaceTex(float2 uv)
+
+    #if defined(UNITY_SINGLE_PASS_STEREO)
+        inline float2 UnityStereoTransformScreenSpaceTex(float2 uv)
+        {
+            return TransformStereoScreenSpaceTex(saturate(uv), 1.0);
+        }
+    #else
+        #define UnityStereoTransformScreenSpaceTex(uv) uv
+    #endif
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_VERTEX_INPUT_INSTANCE_ID
+
+    if((UNITY_INSTANCING_ENABLED) || defined(UNITY_PROCEDURAL_INSTANCING_ENABLED) || defined(UNITY_STEREO_INSTANCING_ENABLED))
+    {
+        if (SHADER_API_PSSL)
+        {
+            #define DEFAULT_UNITY_VERTEX_INPUT_INSTANCE_ID uint instanceID;
+        }
+        else
+        {
+            #define DEFAULT_UNITY_VERTEX_INPUT_INSTANCE_ID uint instanceID : SV_InstanceID;
+        }
+    }
+    else
+    {
+        #define DEFAULT_UNITY_VERTEX_INPUT_INSTANCE_ID
+    }
+    
+    if (!(UNITY_VERTEX_INPUT_INSTANCE_ID))
+    {
+        #define UNITY_VERTEX_INPUT_INSTANCE_ID DEFAULT_UNITY_VERTEX_INPUT_INSTANCE_ID
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_VERTEX_OUTPUT_STEREO
+
+    if(UNITY_STEREO_INSTANCING_ENABLED)
+    {
+        if (SHADER_API_GLES3 || SHADER_API_GLCORE)
+        {
+            #define DEFAULT_UNITY_VERTEX_OUTPUT_STEREO uint stereoTargetEyeIndexSV : SV_RenderTargetArrayIndex; uint stereoTargetEyeIndex : BLENDINDICES0;
+        }
+        else
+        {
+            #define DEFAULT_UNITY_VERTEX_OUTPUT_STEREO uint stereoTargetEyeIndex : SV_RenderTargetArrayIndex;
+        }
+
+        #define DEFAULT_UNITY_VERTEX_OUTPUT_STEREO_EYE_INDEX uint stereoTargetEyeIndex : BLENDINDICES0;
+    }
+    else if(UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        #define DEFAULT_UNITY_VERTEX_OUTPUT_STEREO float stereoTargetEyeIndex : BLENDWEIGHT0;
+    }
+    else
+    {
+        #define DEFAULT_UNITY_VERTEX_OUTPUT_STEREO
+        #define DEFAULT_UNITY_VERTEX_OUTPUT_STEREO_EYE_INDEX
+    }
+
+    if (!UNITY_VERTEX_OUTPUT_STEREO_EYE_INDEX)
+    {
+        #define UNITY_VERTEX_OUTPUT_STEREO_EYE_INDEX DEFAULT_UNITY_VERTEX_OUTPUT_STEREO_EYE_INDEX
+    }
+
+    if (!UNITY_VERTEX_OUTPUT_STEREO)
+    {
+        #define UNITY_VERTEX_OUTPUT_STEREO DEFAULT_UNITY_VERTEX_OUTPUT_STEREO
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output)
+
+    if(UNITY_STEREO_INSTANCING_ENABLED)
+    {
+        if (SHADER_API_GLES3 || SHADER_API_GLCORE)
+        {
+            #define DEFAULT_UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output) output.stereoTargetEyeIndexSV = unity_StereoEyeIndex; output.stereoTargetEyeIndex = unity_StereoEyeIndex;
+        }
+        else
+        {
+            #define DEFAULT_UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output) output.stereoTargetEyeIndex = unity_StereoEyeIndex
+        }
+    }
+    else if(UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        // HACK: Workaround for Mali shader compiler issues with directly using GL_ViewID_OVR (GL_OVR_multiview). This array just contains the values 0 and 1.
+        #define DEFAULT_UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output) output.stereoTargetEyeIndex = unity_StereoEyeIndices[unity_StereoEyeIndex].x;
+    }
+    else
+    {
+        #define DEFAULT_UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output)
+    }
+
+    if (!UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO)
+    {
+        #define UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output) DEFAULT_UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output)
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i)
+
+    if(UNITY_STEREO_INSTANCING_ENABLED)
+    {
+        #define DEFAULT_UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input) unity_StereoEyeIndex = input.stereoTargetEyeIndex;
+    }
+    else if(UNITY_STEREO_MULTIVIEW_ENABLED)
+    {
+        if (SHADER_STAGE_VERTEX)
+        {
+            #define DEFAULT_UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input)
+        }
+        else
+        {
+            #define DEFAULT_UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input) unity_StereoEyeIndex.x = input.stereoTargetEyeIndex;
+        }
+    }
+    else
+    {
+        #define DEFAULT_UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input)
+    }
+
+    #if (!UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX)
+    {
+        #define UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input) DEFAULT_UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input)
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (UnityInstancing.cginc)
+    Deconstructed - UNITY_SETUP_INSTANCE_ID(v)
+
+    if (UNITY_INSTANCING_ENABLED || UNITY_PROCEDURAL_INSTANCING_ENABLED || UNITY_STEREO_INSTANCING_ENABLED)
+    {
+        if (UNITY_PROCEDURAL_INSTANCING_ENABLED)
+        {
+            if (!UNITY_INSTANCING_PROCEDURAL_FUNC)
+            {
+                #error "UNITY_INSTANCING_PROCEDURAL_FUNC must be defined."
+            }
+            else
+            {
+                #define DEFAULT_UNITY_SETUP_INSTANCE_ID(input)      
+                { 
+                    UnitySetupInstanceID(UNITY_GET_INSTANCE_ID(input)); 
+                    UNITY_INSTANCING_PROCEDURAL_FUNC(); 
+                    UnitySetupCompoundMatrices(); 
+                }
+            }
+        }
+        else
+        {
+            #define DEFAULT_UNITY_SETUP_INSTANCE_ID(input)          
+            { 
+                UnitySetupInstanceID(UNITY_GET_INSTANCE_ID(input)); 
+                UnitySetupCompoundMatrices(); 
+            }
+        }
+    }
+    else
+    {
+        #define DEFAULT_UNITY_SETUP_INSTANCE_ID(input)
+    }
+
+    if (!UNITY_SETUP_INSTANCE_ID)
+    {
+        #define UNITY_SETUP_INSTANCE_ID(input) DEFAULT_UNITY_SETUP_INSTANCE_ID(input)
+    }
+
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+* ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+    (HLSLSupport.cginc)
+    Deconstructed - UNITY_INITIALIZE_OUTPUT(type, name)
+
+    // Initialize arbitrary structure with zero values.
+    // Not supported on some backends (e.g. Cg-based particularly with nested structs).
+    if (UNITY_COMPILER_HLSL || SHADER_API_PSSL || UNITY_COMPILER_HLSLCC)
+    {
+        #define UNITY_INITIALIZE_OUTPUT(type, name) name = (type)0;
+    }
+    else
+    {
+        #define UNITY_INITIALIZE_OUTPUT(type, name)
+    }
+*/

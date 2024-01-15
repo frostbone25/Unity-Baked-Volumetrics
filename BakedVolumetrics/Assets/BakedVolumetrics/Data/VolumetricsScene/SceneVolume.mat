@@ -25,17 +25,18 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _VolumeTexture:
-        m_Texture: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
+        m_Texture: {fileID: 11700000, guid: cf5d7616db2b0474487300ebd9e43c65, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
+    - RAYMARCH_STEPSize: 25
     - _: 0
     - _Color: 0
     - _EnableAnimatedJitter: 0
     - _HalfResolution: 0
     - _MipQuadOptimization: 0
     - _RaymarchJitterStrength: 1
-    - _RaymarchStepSize: 47.1
+    - _RaymarchStepSize: 50
     - _Samples: 1
     - _SkipPixels: 1
     - _VolumeDensity: 1

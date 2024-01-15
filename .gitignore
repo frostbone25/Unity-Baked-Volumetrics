@@ -29,6 +29,9 @@ BakedVolumetrics/Assets/XRI.meta
 BakedVolumetrics/Assets/BakedVolumetrics/Data/Map_v1/
 BakedVolumetrics/Assets/BakedVolumetrics/Data/Map_v1.meta
 
+BakedVolumetrics/AndroidBuilds
+AndroidBuilds
+
 # Asset meta data should only be ignored when the corresponding asset is also ignored
 !BakedVolumetrics/[Aa]ssets/**/*.meta
 

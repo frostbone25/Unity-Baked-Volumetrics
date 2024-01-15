@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: adb84e30e02715445aeb9959894e3b4d, type: 3}
   m_Name: ColorGrading
   m_EditorClassIdentifier: 
-  active: 1
+  active: 0
   enabled:
     overrideState: 1
     value: 1
@@ -1323,26 +1323,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f75252d0cbb0f3c4fb7fffd2942fdd6a, type: 3}
   m_Name: BakedVolumetricsV1
   m_EditorClassIdentifier: 
-  active: 0
+  active: 1
   enabled:
     overrideState: 1
     value: 1
   jitter:
     overrideState: 1
-    value: {fileID: 2800000, guid: b279cbca442fec5409163a21328c9e35, type: 2}
+    value: {fileID: 2800000, guid: ddf055324c97ca24b924b70118f98a00, type: 3}
     defaultState: 1
   density:
     overrideState: 1
     value: 1
   stepSize:
     overrideState: 1
-    value: 63.6
+    value: 25
   jitterStrength:
     overrideState: 1
     value: 2
   volume:
     overrideState: 1
-    value: {fileID: 0}
+    value: {fileID: 11700000, guid: b6568f1c32a383647a64a69c61426cfc, type: 2}
     defaultState: 1
   volumeResolution:
     overrideState: 1
