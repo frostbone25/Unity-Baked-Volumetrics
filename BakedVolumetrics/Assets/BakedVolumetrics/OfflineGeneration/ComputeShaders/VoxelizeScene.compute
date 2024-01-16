@@ -1,0 +1,150 @@
+#define THREAD_GROUP_SIZE_X 8
+#define THREAD_GROUP_SIZE_Y 8
+#define THREAD_GROUP_SIZE_Z 8
+
+#include "ComputeTextureSampling.cginc"
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+#pragma multi_compile_local _ X_POS
+#pragma multi_compile_local _ X_NEG
+
+#pragma multi_compile_local _ Y_POS
+#pragma multi_compile_local _ Y_NEG
+
+#pragma multi_compile_local _ Z_POS
+#pragma multi_compile_local _ Z_NEG
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+RWTexture2D<float4> CameraVoxelRender;
+RWTexture3D<float4> Write;
+
+float3 VolumeResolution;
+
+int AxisIndex;
+
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_VoxelizeScene
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_VoxelizeScene(uint3 id : SV_DispatchThreadID)
+{
+    //Write[id.xyz] = float4(0, 1, 0, 1);
+    //return;
+
+    uint3 indexPosition = id;
+
+    //Write[id.xyz] = float4(0, 0, 0, 0);
+
+    #if defined (X_POS) //voxelCameraSlice = new RenderTexture(voxelResolution.z, voxelResolution.y, rtDepth, rtFormat);
+        uint3 Offsets = uint3(0, 0, 0);
+        uint3 WriteIndex = uint3(AxisIndex, indexPosition.y, indexPosition.z);
+        uint2 CameraVoxelRenderIndex = uint2(VolumeResolution.z - indexPosition.z, indexPosition.y);
+
+        if (!(CameraVoxelRender[CameraVoxelRenderIndex].a > 0.0f))
+            return;
+
+        WriteIndex += Offsets;
+        //Write[WriteIndex] = float4(0, 0, 0, 0);
+
+        Write[WriteIndex] = CameraVoxelRender[CameraVoxelRenderIndex];
+
+        return;
+    #elif defined (X_NEG) //voxelCameraSlice = new RenderTexture(voxelResolution.z, voxelResolution.y, rtDepth, rtFormat);
+        uint3 Offsets = uint3(-1, 0, 0);
+        uint3 WriteIndex = uint3(VolumeResolution.x - AxisIndex, indexPosition.y, indexPosition.z);
+        uint2 CameraVoxelRenderIndex = uint2(indexPosition.z, indexPosition.y);
+
+        if (!(CameraVoxelRender[CameraVoxelRenderIndex].a > 0.0f))
+            return;
+
+        WriteIndex += Offsets;
+        //Write[WriteIndex] = float4(0, 0, 0, 0);
+
+        if (Write[WriteIndex].a > 0.0f)
+            Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[CameraVoxelRenderIndex]) * 0.5;
+        else
+            Write[WriteIndex] = CameraVoxelRender[CameraVoxelRenderIndex];
+
+        return;
+    #elif defined (Y_POS) //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.z, rtDepth, rtFormat);
+        uint3 Offsets = uint3(0, 0, 0);
+        uint3 WriteIndex = uint3(indexPosition.x, AxisIndex, indexPosition.z);
+        uint2 CameraVoxelRenderIndex = uint2(indexPosition.x, VolumeResolution.z - indexPosition.z);
+
+        if (!(CameraVoxelRender[CameraVoxelRenderIndex].a > 0.0f))
+            return;
+
+        WriteIndex += Offsets;
+        //Write[WriteIndex] = float4(0, 0, 0, 0);
+
+        if (Write[WriteIndex].a > 0.0f)
+            Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[CameraVoxelRenderIndex]) * 0.5;
+        else
+            Write[WriteIndex] = CameraVoxelRender[CameraVoxelRenderIndex];
+
+        return;
+    #elif defined (Y_NEG) //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.z, rtDepth, rtFormat);
+        uint3 Offsets = uint3(0, -1, 0);
+        uint3 WriteIndex = uint3(indexPosition.x, VolumeResolution.y - AxisIndex, indexPosition.z);
+        uint2 CameraVoxelRenderIndex = uint2(indexPosition.x, indexPosition.z);
+
+        if (!(CameraVoxelRender[CameraVoxelRenderIndex].a > 0.0f))
+            return;
+
+        WriteIndex += Offsets;
+        //Write[WriteIndex] = float4(0, 0, 0, 0);
+
+        if (Write[WriteIndex].a > 0.0f)
+            Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[CameraVoxelRenderIndex]) * 0.5;
+        else
+            Write[WriteIndex] = CameraVoxelRender[CameraVoxelRenderIndex];
+
+        return;
+    #elif defined (Z_POS) //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.y, rtDepth, rtFormat);
+        uint3 Offsets = uint3(0, 0, 0);
+        uint3 WriteIndex = uint3(indexPosition.x, indexPosition.y, AxisIndex);
+        uint2 CameraVoxelRenderIndex = uint2(indexPosition.x, indexPosition.y);
+
+        if (!(CameraVoxelRender[CameraVoxelRenderIndex].a > 0.0f))
+            return;
+
+        WriteIndex += Offsets;
+        //Write[WriteIndex] = float4(0, 0, 0, 0);
+
+        if (Write[WriteIndex].a > 0.0f)
+            Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[CameraVoxelRenderIndex]) * 0.5;
+        else
+            Write[WriteIndex] = CameraVoxelRender[CameraVoxelRenderIndex];
+
+        return;
+    #elif defined (Z_NEG) //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.y, rtDepth, rtFormat);
+        uint3 Offsets = uint3(0, 0, -1);
+        uint3 WriteIndex = uint3(indexPosition.x, indexPosition.y, VolumeResolution.z - AxisIndex);
+        uint2 CameraVoxelRenderIndex = uint2(VolumeResolution.x - indexPosition.x, indexPosition.y);
+
+        if (!(CameraVoxelRender[CameraVoxelRenderIndex].a > 0.0f))
+            return;
+
+        WriteIndex += Offsets;
+        //Write[WriteIndex] = float4(0, 0, 0, 0);
+
+        if (Write[WriteIndex].a > 0.0f)
+            Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[CameraVoxelRenderIndex]) * 0.5;
+        else
+            Write[WriteIndex] = CameraVoxelRender[CameraVoxelRenderIndex];
+
+        return;
+    #endif
+
+    Write[id.xyz] = float4(0, 0, 0, 0);
+
+    return;
+}

@@ -1,0 +1,127 @@
+#define THREAD_GROUP_SIZE_X 8
+#define THREAD_GROUP_SIZE_Y 8
+#define THREAD_GROUP_SIZE_Z 8
+
+//https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityCG.cginc
+//From UnityCG.cginc
+#define UNITY_PI            3.14159265359f
+#define UNITY_TWO_PI        6.28318530718f
+
+//This acts like a bias for the surface tracing functions, 1 gives best results.
+//Though this can cause issues with thin geometry (i.e. things that are only represented as a single voxel and no neighboring ones)
+//TODO: With voxelization, introduce an adjustable thickness modifier when generating them for the scene.
+#define SURFACE_BOUNCE_OCCLUSION_SKIP_ITERATION 1
+
+//[FIX]: (Thanks Pema!) This is a solution to solve the problem with causing TDR/driver timeouts.
+//We force the occlusion checking loop to terminate at some point even if it manages to run forever somehow.
+#define MAX_LOOP_ITERATIONS 2048
+
+#include "ComputeTextureSampling.cginc"
+#include "Random.cginc"
+#include "Sampling.cginc"
+#include "VoxelTracerUtilities.cginc"
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+#pragma multi_compile_local _ NORMAL_ORIENTED_HEMISPHERE_SAMPLING
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+Texture3D<float4> DirectLightSurface;
+Texture3D<float4> SceneAlbedo;
+Texture3D<float4> SceneNormal;
+
+RWTexture3D<float4> Write;
+
+float3 VolumePosition;
+float3 VolumeSize;
+float3 VolumeResolution;
+
+int MaxBounceSamples;
+
+float IndirectIntensity;
+float AlbedoBoost;
+
+RWStructuredBuffer<int> DummyComputeBuffer;
+
+//||||||||||||||||||||||||||||| ComputeShader_TraceSurfaceBounceLight |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_TraceSurfaceBounceLight |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_TraceSurfaceBounceLight |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_TraceSurfaceBounceLight
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_TraceSurfaceBounceLight(uint3 id : SV_DispatchThreadID)
+{
+    float3 voxelPosition = id.xyz + float3(0.5, 0.5, 0.5);
+    voxelPosition /= VolumeResolution.xyz;
+
+    float3 singleVoxelSize = VolumeSize / VolumeResolution;
+    float3 volumeHalfSize = VolumeSize * 0.5f;
+    float3 worldVoxelPosition = VolumePosition + (voxelPosition * VolumeSize) - volumeHalfSize;
+
+    float4 sceneAlbedo = TEX3D_SHARP(SceneAlbedo, voxelPosition);
+    //float4 sceneAlbedo = SceneAlbedo[id.xyz];
+
+    //[OPTIMIZATION]
+    //Since we are tracing "surface light", we don't care about transparent voxels, only opaque ones matter.
+    //So if the current voxel is transparent, then we stop here.
+    if (!(sceneAlbedo.a > 0.0))
+        return;
+
+    //float4 sceneNormal = TEX3D_SHARP(SceneNormal, voxelPosition);
+    float4 sceneNormal = SceneNormal[id.xyz];
+    sceneNormal = sceneNormal * 2.0f - 1.0f;
+
+    //trace lights
+    float4 finalColor = float4(0, 0, 0, 1);
+
+    float2 noise = float2(GenerateRandomFloat(voxelPosition.xyz * VolumeResolution), GenerateRandomFloat(voxelPosition.xyz * VolumeResolution));
+
+    float3 vector_bounceRayPosition = worldVoxelPosition;
+
+    #if defined (NORMAL_ORIENTED_HEMISPHERE_SAMPLING)
+        float3 vector_bounceRayDirection = SampleHemisphereCosine(noise.x, noise.y, sceneNormal);
+    #else
+        float3 vector_bounceRayDirection = SampleSphereUniform(noise.x, noise.y);
+    #endif
+
+    int iterationIndex = 0;
+
+    //NOTE: This is the most expensive operation, marching our ray until we hit an opaque voxel.
+    while(iterationIndex < MAX_LOOP_ITERATIONS)
+    {
+        if (PositionInVolumeBounds(vector_bounceRayPosition.xyz, VolumePosition, VolumeSize) == false)
+            break;
+
+        //keep stepping the ray in world space
+        vector_bounceRayPosition += vector_bounceRayDirection * singleVoxelSize;
+
+        if (iterationIndex >= SURFACE_BOUNCE_OCCLUSION_SKIP_ITERATION)
+        {
+            float3 bounceLight_scaledRayPosition = ((vector_bounceRayPosition + volumeHalfSize) - VolumePosition) / VolumeSize;
+            float4 bounceLight_sceneSample = TEX3D_SHARP(DirectLightSurface, bounceLight_scaledRayPosition);
+            //float4 bounceLight_sceneSample = DirectLightSurface[bounceLight_scaledRayPosition.xyz * VolumeResolution];
+
+            if (bounceLight_sceneSample.a > 0.0)
+            {
+                bounceLight_sceneSample.rgb *= max(0.0f, dot(sceneNormal, vector_bounceRayDirection));
+                bounceLight_sceneSample.rgb *= IndirectIntensity;
+                //bounceLight_sceneSample.rgb *= sceneAlbedo.rgb * AlbedoBoost;
+                bounceLight_sceneSample.rgb *= (sceneAlbedo.rgb / UNITY_PI) * AlbedoBoost; //energy conserving lambertian BDRF
+
+                finalColor.rgb += bounceLight_sceneSample.rgb;
+                break;
+            }
+        }
+
+        iterationIndex++;
+    }
+
+    finalColor = max(0.0f, finalColor);
+
+    Write[id.xyz] += finalColor * (1.0f / MaxBounceSamples);
+}

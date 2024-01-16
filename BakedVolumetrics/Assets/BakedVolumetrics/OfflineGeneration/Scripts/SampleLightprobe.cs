@@ -12,6 +12,8 @@ namespace BakedVolumetrics
 {
     public class SampleLightprobe : MonoBehaviour
     {
+        [HideInInspector] public bool showUI;
+
         //|||||||||||||||||||||||||||||||||||||||||| PUBLIC VARIABLES ||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||| PUBLIC VARIABLES ||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||| PUBLIC VARIABLES ||||||||||||||||||||||||||||||||||||||||||
@@ -37,8 +39,6 @@ namespace BakedVolumetrics
         //|||||||||||||||||||||||||||||||||||||||||| PRIVATE VARIABLES ||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||| PRIVATE VARIABLES ||||||||||||||||||||||||||||||||||||||||||
 
-        [HideInInspector] public bool showUI;
-
         private VolumeGenerator volumeGenerator => GetComponent<VolumeGenerator>();
 
         private string volumeName => volumeGenerator.volumeName;
@@ -57,12 +57,14 @@ namespace BakedVolumetrics
         private string localAssetSceneDataFolder => localAssetDataFolder + "/" + activeScene.name;
         private string adjustmentsComputeShaderAssetPath => localAssetComputeFolder + "/Adjustments3D.compute";
         private string gaussianBlurComputeShaderAssetPath => localAssetComputeFolder + "/GaussianBlur3D.compute";
-        private string slicerComputeShaderAssetPath => localAssetComputeFolder + "/Slicer.compute";
+        private string slicerComputeShaderAssetPath => localAssetComputeFolder + "/VolumeSlicer.compute";
+        private string densityComputeShaderAssetPath => localAssetComputeFolder + "/ApplyVolumeDensity.compute";
         private string lightprobeVolumeAssetPath => localAssetSceneDataFolder + "/" + string.Format("{0}_LightProbe.asset", volumeName);
 
         private ComputeShader adjustments;
         private ComputeShader gaussianBlur;
         private ComputeShader slicer;
+        private ComputeShader density;
 
         private static string sceneStaticCollidersName = "TEMP_SceneStaticColliders";
         private GameObject sceneStaticColliders;
@@ -84,6 +86,9 @@ namespace BakedVolumetrics
             if (slicer == null) 
                 slicer = AssetDatabase.LoadAssetAtPath<ComputeShader>(slicerComputeShaderAssetPath);
 
+            if (density == null)
+                density = AssetDatabase.LoadAssetAtPath<ComputeShader>(densityComputeShaderAssetPath);
+
             if (adjustments == null)
             {
                 Debug.LogError(string.Format("{0} does not exist!", adjustmentsComputeShaderAssetPath));
@@ -94,9 +99,14 @@ namespace BakedVolumetrics
                 Debug.LogError(string.Format("{0} does not exist!", gaussianBlurComputeShaderAssetPath));
                 return false;
             }
-            else if(adjustments == null)
+            else if(slicer == null)
             {
-                Debug.LogError(string.Format("{0} does not exist!", slicer));
+                Debug.LogError(string.Format("{0} does not exist!", slicerComputeShaderAssetPath));
+                return false;
+            }
+            else if (density == null)
+            {
+                Debug.LogError(string.Format("{0} does not exist!", densityComputeShaderAssetPath));
                 return false;
             }
             else
@@ -199,21 +209,7 @@ namespace BakedVolumetrics
                             colorResult = resultingColors[0];
                         }
 
-                        //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-                        //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-                        //|||||||||||||||||||| DENSITY (A) ||||||||||||||||||||||||
-                        float alphaResult = VolumeDensity.ComputeDensity(
-                            volumeGenerator.densityType, 
-                            probePosition, 
-                            colorResult,
-                            volumeGenerator.densityConstant,
-                            volumeGenerator.densityHeight,
-                            volumeGenerator.densityHeightFallof,
-                            volumeGenerator.densityBottom,
-                            volumeGenerator.densityTop,
-                            volumeGenerator.densityInvertLuminance);
-
-                        colorResult = new Color(colorResult.r, colorResult.g, colorResult.b, alphaResult);
+                        colorResult = new Color(colorResult.r, colorResult.g, colorResult.b, 1.0f);
 
                         //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
                         //|||||||||||||||||||| FINAL ||||||||||||||||||||||||
@@ -238,7 +234,7 @@ namespace BakedVolumetrics
             {
                 anisoLevel = 0,
                 filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Repeat,
+                wrapMode = TextureWrapMode.Clamp,
                 mipMaps = true,
             };
 
@@ -346,6 +342,43 @@ namespace BakedVolumetrics
                 gaussianBlur.Dispatch(ComputeShader_GaussianBlur, Mathf.CeilToInt(volumeResolution.x / THREAD_GROUP_SIZE_X), Mathf.CeilToInt(volumeResolution.y / THREAD_GROUP_SIZE_Y), Mathf.CeilToInt(volumeResolution.z / THREAD_GROUP_SIZE_Z));
             }
 
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING DENSITY ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING DENSITY ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING DENSITY ||||||||||||||||||||||||||||||||||||||||||
+
+            VolumeGeneratorUtillity.UpdateProgressBar("Applying Density...", 0.5f);
+
+            Texture3D tempRead = renderTextureConverter.ConvertFromRenderTexture3D(volumeWrite, false);
+
+            //fetch our main adjustments function kernel in the compute shader
+            int ComputeShader_ApplyVolumeDensity = density.FindKernel("ComputeShader_ApplyVolumeDensity");
+
+            density.SetVector("VolumeResolution", new Vector4(volumeResolution.x, volumeResolution.y, volumeResolution.z, 0));
+            density.SetVector("VolumePosition", transform.position);
+            density.SetVector("VolumeSize", volumeSize);
+
+            //make sure the compute shader knows the following parameters.
+            density.SetFloat("DensityConstant", volumeGenerator.densityConstant);
+            density.SetFloat("DensityTop", volumeGenerator.densityTop);
+            density.SetFloat("DensityBottom", volumeGenerator.densityBottom);
+            density.SetFloat("DensityHeight", volumeGenerator.densityHeight);
+            density.SetFloat("DensityHeightFallof", volumeGenerator.densityHeightFallof);
+            density.SetBool("DensityInvertLuminance", volumeGenerator.densityInvertLuminance);
+            //density.SetVector("unity_ColorSpaceLuminance", Shader.GetGlobalVector("unity_ColorSpaceLuminance"));
+            density.SetVector("unity_ColorSpaceLuminance", new Vector4(0.2125f, 0.7154f, 0.0721f, 0.0f));
+
+            SetComputeKeyword(density, "DENSITY_CONSTANT", volumeGenerator.densityType == DensityType.Constant);
+            SetComputeKeyword(density, "DENSITY_LUMINANCE", volumeGenerator.densityType == DensityType.Luminance);
+            SetComputeKeyword(density, "DENSITY_HEIGHTBASED", volumeGenerator.densityType == DensityType.HeightBased);
+            SetComputeKeyword(density, "DENSITY_HEIGHTBASEDLUMINANCE", volumeGenerator.densityType == DensityType.HeightBasedLuminance);
+
+            //feed our compute shader the appropriate textures.
+            density.SetTexture(ComputeShader_ApplyVolumeDensity, "Read", tempRead);
+            density.SetTexture(ComputeShader_ApplyVolumeDensity, "Write", volumeWrite);
+
+            //let the GPU perform color adjustments to the 3D volume.
+            density.Dispatch(ComputeShader_ApplyVolumeDensity, Mathf.CeilToInt(volumeResolution.x / THREAD_GROUP_SIZE_X), Mathf.CeilToInt(volumeResolution.y / THREAD_GROUP_SIZE_Y), Mathf.CeilToInt(volumeResolution.z / THREAD_GROUP_SIZE_Z));
+
             //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
             //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
             //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
@@ -412,6 +445,18 @@ namespace BakedVolumetrics
                 if (sceneStaticColliders != null)
                     DestroyImmediate(sceneStaticColliders);
             }
+        }
+
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| UTILITIES ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| UTILITIES ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+        //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| UTILITIES ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+        public static void SetComputeKeyword(ComputeShader computeShader, string keyword, bool value)
+        {
+            if (value)
+                computeShader.EnableKeyword(keyword);
+            else
+                computeShader.DisableKeyword(keyword);
         }
     }
 }

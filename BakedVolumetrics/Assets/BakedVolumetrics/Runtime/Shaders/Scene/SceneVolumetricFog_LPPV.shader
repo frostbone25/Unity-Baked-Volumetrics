@@ -12,6 +12,7 @@ Shader "SceneVolumetricFog_LPPV"
         [Header(Rendering)]
         [Toggle(_HALF_RESOLUTION)] _HalfResolution("Half Resolution", Float) = 0
         [Toggle(_ANIMATED_NOISE)] _EnableAnimatedJitter("Animated Noise", Float) = 0
+        [Toggle(_KILL_RAYS_EXITING_VOLUME)] _StopRaysExitingVolume("Kill Rays Exiting Volume", Float) = 1
         _JitterTexture("Jitter Texture", 2D) = "white" {}
         _RaymarchJitterStrength("Raymarch Jitter", Float) = 2
     }
@@ -41,6 +42,7 @@ Shader "SceneVolumetricFog_LPPV"
 
             #pragma shader_feature_local _ANIMATED_NOISE
             #pragma shader_feature_local _HALF_RESOLUTION
+            #pragma shader_feature_local _KILL_RAYS_EXITING_VOLUME
 
             #include "UnityCG.cginc"
             #include "QuadIntrinsics.cginc"
@@ -217,7 +219,7 @@ Shader "SceneVolumetricFog_LPPV"
                 const fixed texelSizeX = unity_ProbeVolumeParams.z;
 
                 // UV offset by orientation
-                fixed3 localViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
+                fixed3 localViewDir = normalize(cameraWorldPositionViewPlane);
 
                 //compute jitter
                 fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * _RaymarchJitterStrength;
@@ -289,6 +291,10 @@ Shader "SceneVolumetricFog_LPPV"
                         else
                             break; //terminante the ray 
                     }
+                    #if defined(_KILL_RAYS_EXITING_VOLUME)
+                        else
+                            break; //terminate the ray
+                    #endif
 
                     //keep stepping forward into the scene
                     raymarch_currentPos += raymarch_rayIncrement * _RaymarchStepSize;

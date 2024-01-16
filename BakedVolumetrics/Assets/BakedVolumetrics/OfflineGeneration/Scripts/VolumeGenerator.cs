@@ -43,6 +43,7 @@ namespace BakedVolumetrics
         public bool densityInvertLuminance = false;
 
         public SampleLightprobe sampleLightprobe;
+        public SampleVoxelTracer sampleVoxelTracer;
 
         public float volumeLightProbeGroupDensityMultiplier = 1;
 
@@ -91,10 +92,13 @@ namespace BakedVolumetrics
         public void Setup()
         {
             sampleLightprobe = gameObject.GetComponent<SampleLightprobe>();
-            //sampleVoxelRaytrace = gameObject.GetComponent<SampleVoxelRaytrace>();
+            sampleVoxelTracer = gameObject.GetComponent<SampleVoxelTracer>();
 
             if (sampleLightprobe == null)
                 sampleLightprobe = gameObject.AddComponent<SampleLightprobe>();
+
+            if (sampleVoxelTracer == null)
+                sampleVoxelTracer = gameObject.AddComponent<SampleVoxelTracer>();
 
             CalculateResolution();
         }
@@ -171,6 +175,10 @@ namespace BakedVolumetrics
             if(lightingSource == LightingSource.LightProbes)
             {
                 return sampleLightprobe.GetGeneratedVolume();
+            }
+            else if (lightingSource == LightingSource.VoxelTracer)
+            {
+                return sampleVoxelTracer.GetGeneratedVolume();
             }
             else
             {

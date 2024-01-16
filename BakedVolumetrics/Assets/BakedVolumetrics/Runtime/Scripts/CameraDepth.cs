@@ -1,11 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.XR;
-using UnityEngine.XR.Management;
-using UnityEngine.Experimental.XR.Interaction;
-using Unity.XR.Oculus;
-using System.Linq;
+//using UnityEngine.XR;
+//using UnityEngine.XR.Management;
+//using UnityEngine.Experimental.XR.Interaction;
+//using Unity.XR.Oculus;
+//using System.Linq;
 
 namespace BakedVolumetrics
 {
@@ -14,11 +14,12 @@ namespace BakedVolumetrics
     {
         public DepthTextureMode mode;
 
-        public bool enableDynamicFFR = false;
-        [Range(0, 4)] public int foveationLevel = 0;
+        //public bool enableDynamicFFR = false;
+        //[Range(0, 4)] public int foveationLevel = 0;
 
         private Camera camera;
 
+        /*
         private void SetOculusSettings()
         {
             if (Unity.XR.Oculus.Performance.TryGetDisplayRefreshRate(out var rate))
@@ -43,25 +44,26 @@ namespace BakedVolumetrics
             Unity.XR.Oculus.Utils.EnableDynamicFFR(enableDynamicFFR);
             Unity.XR.Oculus.Utils.SetFoveationLevel(foveationLevel);
         }
+        */
 
         private void Awake()
         {
             camera = GetComponent<Camera>();
             camera.depthTextureMode = mode;
 
-            SetOculusSettings();
+            //SetOculusSettings();
         }
 
         private void Update()
         {
             camera.depthTextureMode = mode;
-            SetOculusSettings();
+            //SetOculusSettings();
         }
 
         private void OnEnable()
         {
             camera.depthTextureMode = mode;
-            SetOculusSettings();
+            //SetOculusSettings();
         }
     }
 }

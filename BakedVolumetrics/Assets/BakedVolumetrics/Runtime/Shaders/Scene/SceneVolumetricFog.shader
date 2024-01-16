@@ -13,6 +13,7 @@
         [Header(Rendering)]
         [Toggle(_HALF_RESOLUTION)] _HalfResolution("Half Resolution", Float) = 0
         [Toggle(_ANIMATED_NOISE)] _EnableAnimatedJitter("Animated Noise", Float) = 0
+        [Toggle(_KILL_RAYS_EXITING_VOLUME)] _StopRaysExitingVolume("Kill Rays Exiting Volume", Float) = 1
         _JitterTexture("Jitter Texture", 2D) = "white" {}
         _RaymarchJitterStrength("Raymarch Jitter", Float) = 2
     }
@@ -41,6 +42,7 @@
 
             #pragma shader_feature_local _ANIMATED_NOISE
             #pragma shader_feature_local _HALF_RESOLUTION
+            #pragma shader_feature_local _KILL_RAYS_EXITING_VOLUME
 
             //#define UseInstancedProps
 
@@ -248,12 +250,8 @@
                 //get the world position vector
                 fixed3 worldPos = cameraWorldPositionViewPlane * linearDepth + _WorldSpaceCameraPos;
 
-                //scale our vectors to the volume
-                fixed3 scaledWorldPos = ((worldPos - VOLUME_POS) + VOLUME_SIZE * 0.5) / VOLUME_SIZE;
-                fixed3 scaledCameraPos = ((_WorldSpaceCameraPos - VOLUME_POS) + VOLUME_SIZE * 0.5) / VOLUME_SIZE;
-
                 // UV offset by orientation
-                fixed3 localViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
+                fixed3 localViewDir = normalize(cameraWorldPositionViewPlane);
 
                 //compute jitter
                 fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * RAYMARCH_STEP_SIZE * RAYMARCH_JITTER_STRENGTH;
@@ -268,38 +266,41 @@
                 //get the length of the step
                 fixed stepLength = length(raymarch_rayIncrement);
 
+                fixed3 halfVolumeSize = VOLUME_SIZE * 0.5;
+
                 //get our starting ray position from the camera
                 fixed3 raymarch_currentPos = _WorldSpaceCameraPos + raymarch_rayIncrement * jitter;
 
                 //start marching
                 for (int i = 0; i < RAYMARCH_STEPS; i++)
                 {
-                    //scale the current ray position to be within the volume
-                    fixed3 scaledPos = ((raymarch_currentPos - VOLUME_POS) + VOLUME_SIZE * 0.5) / VOLUME_SIZE;
-
-                    //get the squared distances of the ray and the world position
-                    fixed distanceRaySq = dot(scaledCameraPos - scaledPos, scaledCameraPos - scaledPos);
-                    fixed distanceWorldSq = dot(scaledCameraPos - scaledWorldPos, scaledCameraPos - scaledWorldPos);
-
                     //make sure we are within our little box
-                    fixed3 isInBox = step(fixed3(0.0, 0.0, 0.0), scaledPos) * step(scaledPos, fixed3(1.0, 1.0, 1.0));
+                    bool isInBox = all(abs(raymarch_currentPos - VOLUME_POS) < halfVolumeSize);
 
                     //IMPORTANT: Check the current position distance of our ray compared to where we started.
                     //If our distance is less than that of the world then that means we aren't intersecting into any objects yet so keep accumulating.
-                    if (distanceRaySq < distanceWorldSq && all(isInBox))
+                    bool isRayPositionIntersectingScene = distance(_WorldSpaceCameraPos, raymarch_currentPos) < distance(_WorldSpaceCameraPos, worldPos);
+
+                    if (isRayPositionIntersectingScene && isInBox)
                     {
                         //And also keep going if we haven't reached the fullest density just yet.
                         if (result.a < 1.0f)
                         {
+                            fixed3 scaledPos = ((raymarch_currentPos - VOLUME_POS) + halfVolumeSize) / VOLUME_SIZE;
+
                             //sample the fog color (rgb = color, a = density)
                             fixed4 sampledColor = tex3Dlod(VOLUME_TEXTURE, fixed4(scaledPos, 0));
 
                             //accumulate the samples
                             result += fixed4(sampledColor.rgb, sampledColor.a) * stepLength; //this is slightly cheaper
                         }
+                        else
+                            break;
                     }
-                    else
-                        break; //terminate the ray
+                    #if defined(_KILL_RAYS_EXITING_VOLUME)
+                        else
+                            break; //terminate the ray
+                    #endif
 
                     //keep stepping forward into the scene
                     raymarch_currentPos += raymarch_rayIncrement * RAYMARCH_STEP_SIZE;

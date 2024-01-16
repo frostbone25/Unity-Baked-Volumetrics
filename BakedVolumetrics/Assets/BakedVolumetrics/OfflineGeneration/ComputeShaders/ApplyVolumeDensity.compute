@@ -1,0 +1,79 @@
+#define THREAD_GROUP_SIZE_X 8
+#define THREAD_GROUP_SIZE_Y 8
+#define THREAD_GROUP_SIZE_Z 8
+
+#include "ComputeTextureSampling.cginc"
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+#pragma multi_compile_local _ DENSITY_CONSTANT
+#pragma multi_compile_local _ DENSITY_LUMINANCE
+#pragma multi_compile_local _ DENSITY_HEIGHTBASED
+#pragma multi_compile_local _ DENSITY_HEIGHTBASEDLUMINANCE
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+Texture3D<float4> Read;
+
+RWTexture3D<float4> Write;
+
+float DensityConstant;
+float DensityTop;
+float DensityBottom;
+float DensityHeight;
+float DensityHeightFallof;
+bool DensityInvertLuminance;
+
+float3 VolumePosition;
+float3 VolumeSize;
+float3 VolumeResolution;
+
+float3 unity_ColorSpaceLuminance;
+
+//||||||||||||||||||||||||||||| ComputeShader_ApplyVolumeDensity |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_ApplyVolumeDensity |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_ApplyVolumeDensity |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_ApplyVolumeDensity
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_ApplyVolumeDensity(uint3 id : SV_DispatchThreadID)
+{
+    float3 voxelPosition = id.xyz + float3(0.5, 0.5, 0.5);
+    voxelPosition /= VolumeResolution.xyz;
+
+    float3 volumeHalfSize = VolumeSize * 0.5f;
+    float3 worldVoxelPosition = VolumePosition + (voxelPosition * VolumeSize) - volumeHalfSize;
+
+    //float4 readVolume = Read[id.xyz];
+    float4 readVolume = TEX3D(Read, voxelPosition);
+
+    #if defined (DENSITY_CONSTANT)
+        readVolume.a = DensityConstant;
+    #elif defined (DENSITY_LUMINANCE)
+        if(DensityInvertLuminance)
+            readVolume.a = 1 - max(0.0, dot(readVolume.rgb, unity_ColorSpaceLuminance));
+        else
+            readVolume.a = max(0.0, dot(readVolume.rgb, unity_ColorSpaceLuminance));
+    #elif defined (DENSITY_HEIGHTBASED)
+        float heightLerpFactor = clamp((worldVoxelPosition.y - DensityHeight) / DensityHeightFallof, 0.0f, 1.0f);
+
+        readVolume.a = lerp(DensityBottom, DensityTop, heightLerpFactor);
+    #elif defined (DENSITY_HEIGHTBASEDLUMINANCE)
+        float luminance = 1.0f;
+
+        if (DensityInvertLuminance)
+            luminance = 1 - max(0.0, dot(readVolume.rgb, unity_ColorSpaceLuminance));
+        else
+            luminance = max(0.0, dot(readVolume.rgb, unity_ColorSpaceLuminance));
+
+        float heightLerpFactor = clamp((worldVoxelPosition.y - DensityHeight) / DensityHeightFallof, 0.0f, 1.0f);
+
+        readVolume.a = lerp(luminance * DensityBottom, luminance * DensityTop, heightLerpFactor);
+    #endif
+
+    Write[id.xyz] = readVolume;
+}

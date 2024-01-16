@@ -1,0 +1,40 @@
+#define THREAD_GROUP_SIZE_X 8
+#define THREAD_GROUP_SIZE_Y 8
+#define THREAD_GROUP_SIZE_Z 8
+
+#include "ComputeTextureSampling.cginc"
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+#pragma multi_compile_local _ FORCE_ALPHA_1
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+Texture3D<float4> AddBufferA;
+Texture3D<float4> AddBufferB;
+
+RWTexture3D<float4> Write;
+
+//||||||||||||||||||||||||||||| ComputeShader_AddBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_AddBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_AddBuffers |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_AddBuffers
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_AddBuffers(uint3 id : SV_DispatchThreadID)
+{
+    float4 addBufferA = AddBufferA[id.xyz];
+    float4 addBufferB = AddBufferB[id.xyz];
+    float4 addedBuffers = addBufferA + addBufferB;
+    addedBuffers.a = saturate(addedBuffers.a);
+
+    #if defined (FORCE_ALPHA_1)
+        addedBuffers.a = 1;
+    #endif
+
+    Write[id.xyz] = addedBuffers;
+}

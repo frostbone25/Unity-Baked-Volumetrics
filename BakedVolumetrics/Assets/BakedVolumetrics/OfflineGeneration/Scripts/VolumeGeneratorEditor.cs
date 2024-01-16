@@ -87,6 +87,7 @@ namespace BakedVolumetrics
 
             LightingSource lightingSourceValue = (LightingSource)lightingSource.intValue;
             scriptObject.sampleLightprobe.showUI = lightingSourceValue == LightingSource.LightProbes;
+            scriptObject.sampleVoxelTracer.showUI = lightingSourceValue == LightingSource.VoxelTracer;
 
             //||||||||||||||||||||||||||||||||| VOLUME PROPERTIES |||||||||||||||||||||||||||||||||
             //||||||||||||||||||||||||||||||||| VOLUME PROPERTIES |||||||||||||||||||||||||||||||||
@@ -135,8 +136,7 @@ namespace BakedVolumetrics
                     scriptObject.GenerateLightProbeGroup();
                 }
             }
-
-            if (lightingSourceValue == LightingSource.LightProbeProxyVolume)
+            else if (lightingSourceValue == LightingSource.LightProbeProxyVolume)
             {
                 EditorGUILayout.LabelField("NOTE: The resolution of the Light Probe Proxy Volume (LPPV) is dependent on two factors. #1: The density of your light probe groups. #2: The resolution of the LPPV. The advantage is that this is dynamic, however results can be rather coarse looking due to the runtime nature.", EditorStyles.helpBox);
 
@@ -150,117 +150,163 @@ namespace BakedVolumetrics
                     scriptObject.GenerateLightProbeGroup();
                 }
             }
-
-            if (scriptObject.lightingSource != LightingSource.LightProbeProxyVolume)
+            else if (lightingSourceValue == LightingSource.VoxelTracer)
             {
-                //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
-                EditorGUILayout.Space(10);
-                EditorGUILayout.LabelField("Volume Density", EditorStyles.whiteLargeLabel);
 
-                if ((VolumeBitDepth)volumeBitDepth.intValue == VolumeBitDepth.RGB8)
+            }
+
+            //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Volume Density", EditorStyles.whiteLargeLabel);
+
+            bool dontShowVolumeDensity = lightingSourceValue == LightingSource.LightProbeProxyVolume || (VolumeBitDepth)volumeBitDepth.intValue == VolumeBitDepth.RGB8;
+
+            if (lightingSourceValue == LightingSource.LightProbeProxyVolume)
+            {
+                EditorGUILayout.LabelField("Light Probe Proxy Volumes (LPPVs) are in use, which generates a volume at runtime. Density can't be applied.", EditorStyles.helpBox);
+            }
+
+            if ((VolumeBitDepth)volumeBitDepth.intValue == VolumeBitDepth.RGB8)
+            {
+                EditorGUILayout.LabelField("Bit Depth is set to RGB8, which has no alpha channel. This means that density will have to be constant since we don't have an alpha channel to set a unique value for every voxel.", EditorStyles.helpBox);
+
+                densityType.intValue = 0; //0 = Constant
+            }
+
+            if(dontShowVolumeDensity == false)
+            {
+                EditorGUILayout.PropertyField(densityType);
+
+                DensityType densityTypeValue = (DensityType)densityType.intValue;
+
+                if (densityTypeValue == DensityType.Constant)
                 {
-                    EditorGUILayout.LabelField("Bit Depth is set to RGB8, which has no alpha channel. This means that density will have to be constant since we don't have an alpha channel to set a unique value for every voxel.", EditorStyles.helpBox);
-
-                    densityType.intValue = 0; //0 = Constant
+                    EditorGUILayout.PropertyField(densityConstant);
                 }
-                else
+                else if (densityTypeValue == DensityType.HeightBased || densityTypeValue == DensityType.HeightBasedLuminance)
                 {
-                    EditorGUILayout.PropertyField(densityType);
+                    EditorGUILayout.PropertyField(densityTop);
+                    EditorGUILayout.PropertyField(densityBottom);
 
-                    DensityType densityTypeValue = (DensityType)densityType.intValue;
-
-                    if (densityTypeValue == DensityType.Constant)
-                    {
-                        EditorGUILayout.PropertyField(densityConstant);
-                    }
-                    else if (densityTypeValue == DensityType.HeightBased || densityTypeValue == DensityType.HeightBasedLuminance)
-                    {
-                        EditorGUILayout.PropertyField(densityTop);
-                        EditorGUILayout.PropertyField(densityBottom);
-
-                        EditorGUILayout.PropertyField(densityHeight);
-                        EditorGUILayout.PropertyField(densityHeightFallof);
-                    }
-
-                    if (densityTypeValue == DensityType.Luminance)
-                    {
-                        EditorGUILayout.PropertyField(densityInvertLuminance);
-                    }
-                    else if (densityTypeValue == DensityType.HeightBasedLuminance)
-                    {
-                        EditorGUILayout.PropertyField(densityInvertLuminance);
-                    }
+                    EditorGUILayout.PropertyField(densityHeight);
+                    EditorGUILayout.PropertyField(densityHeightFallof);
                 }
 
-                //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
-                EditorGUILayout.Space(10);
-                EditorGUILayout.LabelField("Gizmos", EditorStyles.whiteLargeLabel);
-                EditorGUILayout.PropertyField(previewBounds);
+                if (densityTypeValue == DensityType.Luminance)
+                {
+                    EditorGUILayout.PropertyField(densityInvertLuminance);
+                }
+                else if (densityTypeValue == DensityType.HeightBasedLuminance)
+                {
+                    EditorGUILayout.PropertyField(densityInvertLuminance);
+                }
+            }
 
-                if ((DensityType)densityType.intValue == DensityType.HeightBased)
-                    EditorGUILayout.PropertyField(previewDensityHeight);
+            //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Gizmos", EditorStyles.whiteLargeLabel);
+            EditorGUILayout.PropertyField(previewBounds);
 
-                EditorGUILayout.PropertyField(previewVoxels);
-                EditorGUILayout.Space(10);
+            if ((DensityType)densityType.intValue == DensityType.HeightBased)
+                EditorGUILayout.PropertyField(previewDensityHeight);
 
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                EditorGUILayout.LabelField("Generation", EditorStyles.whiteLargeLabel);
+            EditorGUILayout.PropertyField(previewVoxels);
+            EditorGUILayout.Space(10);
 
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
+            EditorGUILayout.LabelField("Generation", EditorStyles.whiteLargeLabel);
 
+            if(lightingSourceValue == LightingSource.LightProbes)
+            {
                 if (GUILayout.Button("Generate Volume"))
                 {
                     scriptObject.GenerateVolume();
                 }
-
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                EditorGUILayout.Space(10);
-                EditorGUILayout.LabelField("Utility", EditorStyles.whiteLargeLabel);
-
-                if (GUILayout.Button("Update Material"))
-                {
-                    scriptObject.UpdateMaterial();
-                }
             }
-            else
+            else if(lightingSourceValue == LightingSource.LightProbeProxyVolume)
             {
-                //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| VOLUME DENSITY |||||||||||||||||||||||||||||||||
-                EditorGUILayout.Space(10);
-                EditorGUILayout.LabelField("Volume Density", EditorStyles.whiteLargeLabel);
-
-                EditorGUILayout.LabelField("Light Probe Proxy Volumes (LPPVs) are in use, which generates a volume at runtime. Density can't be applied.", EditorStyles.helpBox);
-
-                //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| GIZMOS |||||||||||||||||||||||||||||||||
-                EditorGUILayout.Space(10);
-                EditorGUILayout.LabelField("Gizmos", EditorStyles.whiteLargeLabel);
-                EditorGUILayout.PropertyField(previewBounds);
-
-                if ((DensityType)densityType.intValue == DensityType.HeightBased)
-                    EditorGUILayout.PropertyField(previewDensityHeight);
-
-                EditorGUILayout.PropertyField(previewVoxels);
-                EditorGUILayout.Space(10);
-
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                //||||||||||||||||||||||||||||||||| FUNCTIONS |||||||||||||||||||||||||||||||||
-                EditorGUILayout.LabelField("Generation", EditorStyles.whiteLargeLabel);
-
                 if (GUILayout.Button("Generate/Update LPPV"))
                 {
                     scriptObject.GenerateLPPV();
                 }
+            }
+            else if (lightingSourceValue == LightingSource.VoxelTracer)
+            {
+                EditorGUILayout.LabelField("Setup", EditorStyles.boldLabel);
+
+                if (GUILayout.Button("Generate Scene Buffers"))
+                    scriptObject.sampleVoxelTracer.GenerateVolumes();
+
+                if (scriptObject.sampleVoxelTracer.enableEnvironmentLighting)
+                {
+                    if (GUILayout.Button("Capture Environment Map"))
+                        scriptObject.sampleVoxelTracer.CaptureEnvironment();
+                }
+
+                EditorGUILayout.Space(10);
+
+                EditorGUILayout.LabelField("Direct Lighting", EditorStyles.boldLabel);
+
+                if (GUILayout.Button("Trace Direct Surface Lighting"))
+                    scriptObject.sampleVoxelTracer.TraceDirectSurfaceLighting();
+
+                if (scriptObject.sampleVoxelTracer.volumetricTracing)
+                {
+                    if (GUILayout.Button("Trace Direct Volume Lighting"))
+                        scriptObject.sampleVoxelTracer.TraceDirectVolumeLighting();
+                }
+
+                if (scriptObject.sampleVoxelTracer.enableEnvironmentLighting)
+                {
+                    if (GUILayout.Button("Trace Environment Surface Lighting"))
+                        scriptObject.sampleVoxelTracer.TraceEnvironmentSurfaceLighting();
+
+                    if (scriptObject.sampleVoxelTracer.volumetricTracing)
+                    {
+                        if (GUILayout.Button("Trace Environment Volume Lighting"))
+                            scriptObject.sampleVoxelTracer.TraceEnvironmentVolumeLighting();
+                    }
+                }
+
+                EditorGUILayout.Space(10);
+
+                EditorGUILayout.LabelField("Bounce Lighting", EditorStyles.boldLabel);
+
+                if (GUILayout.Button("Trace Bounce Surface Lighting"))
+                    scriptObject.sampleVoxelTracer.TraceBounceSurfaceLighting();
+
+                if (scriptObject.sampleVoxelTracer.volumetricTracing)
+                {
+                    if (GUILayout.Button("Trace Bounce Volume Lighting"))
+                        scriptObject.sampleVoxelTracer.TraceBounceVolumeLighting();
+                }
+
+                EditorGUILayout.Space(10);
+
+                EditorGUILayout.LabelField("Final", EditorStyles.boldLabel);
+
+                if (scriptObject.sampleVoxelTracer.volumetricTracing)
+                {
+                    if (GUILayout.Button("Combine Volume Direct and Bounce Light"))
+                        scriptObject.sampleVoxelTracer.CombineVolumeLighting();
+                }
+            }
+
+            //||||||||||||||||||||||||||||||||| UTILITY FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| UTILITY FUNCTIONS |||||||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||||||| UTILITY FUNCTIONS |||||||||||||||||||||||||||||||||
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Utility", EditorStyles.whiteLargeLabel);
+
+            if (GUILayout.Button("Update Material"))
+            {
+                scriptObject.UpdateMaterial();
             }
 
             serializedObject.ApplyModifiedProperties();
