@@ -40,8 +40,6 @@ To start you define a box volume within your scene, the setting where it is loca
 
 For the shader, what we do is sample that 3D texture and perform a raymarch through it, checking it against the scene depth buffer. The ray terminates if: it intersects with the scene, is out of bounds, or if the density is too thick. While raymarching also we jitter the samples to improve the quality. The final result is then lerped with the scene color buffer based on transmittance.
 
-NOTE: When sampling lighting, at the time of writing I **HIGHLY RECCOMEND** you sample from light probes rather than from the raytracers. The raytracers implemented are in various states of completion and don't fully work yet, and also miss out on features like bounce and indirect lighting. With light probes however, these features are inherent to it as they are sampled directly from the unity lightmapper. I recommend setting up a light probe group in a grid-like fashion within the bounds of a given volume, with a matching density for the best results. The screenshots shown here are taken with the light probe method.
-
 ## Multiple Implementations
 
 There are 2 versions of this effect, two being a typical **Post Process** version, and the other is a **Scene Based solution** solution...
