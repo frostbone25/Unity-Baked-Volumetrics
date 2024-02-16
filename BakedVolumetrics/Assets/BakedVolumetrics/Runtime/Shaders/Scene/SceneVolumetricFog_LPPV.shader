@@ -106,7 +106,7 @@ Shader "SceneVolumetricFog_LPPV"
                 fixed4 vertex : SV_POSITION;
                 fixed4 screenPos : TEXCOORD0;
                 fixed3 camRelativeWorldPos : TEXCOORD1;
-
+                float3 worldDirection : TEXCOORD2;
                 //Single Pass Instanced Support
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -162,8 +162,20 @@ Shader "SceneVolumetricFog_LPPV"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                o.screenPos = UnityStereoTransformScreenSpaceTex(ComputeScreenPos(o.vertex));
                 o.camRelativeWorldPos = mul(unity_ObjectToWorld, fixed4(v.vertex.xyz, 1.0)).xyz - _WorldSpaceCameraPos;
+                
+                // Screen Position technique from https://github.com/cnlohr/shadertrixx?tab=readme-ov-file#depth-textures--getting-worldspace-info
+                // Subtract camera position from vertex position in world
+                // to get a ray pointing from the camera to this vertex.
+                o.worldDirection = mul(unity_ObjectToWorld, v.vertex).xyz - _WorldSpaceCameraPos;
+
+                // Save the clip space position so we can use it later.
+                // This also handles situations where the Y is flipped.
+                float2 suv = o.vertex * float2( 0.5, 0.5*_ProjectionParams.x);
+                                
+                // Tricky, constants like the 0.5 and the second paramter
+                // need to be premultiplied by o.vertex.w.
+                o.screenPos = float4(TransformStereoScreenSpaceTex(suv + 0.5*o.vertex.w, o.vertex.w), 0, o.vertex.w);
 
                 return o;
             }
@@ -185,41 +197,34 @@ Shader "SceneVolumetricFog_LPPV"
                     {
                 #endif
 
-                //get our screen uv coords
-                fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
+                // Compute projective scaling factor...
+                float perspectiveDivide = 1.0f / i.vertex.w;
 
+                // Calculate our UV within the screen (for reading depth buffer)
+                float2 screenUV = i.screenPos.xy * perspectiveDivide;
 
                 #if UNITY_UV_STARTS_AT_TOP
                     if (_CameraDepthTexture_TexelSize.y < 0)
                         screenUV.y = 1 - screenUV.y;
                 #endif
 
-                #if UNITY_SINGLE_PASS_STEREO
-                    // If Single-Pass Stereo mode is active, transform the
-                    // coordinates to get the correct output UV for the current eye.
-                    fixed4 scaleOffset = unity_StereoScaleOffset[unity_StereoEyeIndex];
-                    screenUV = (screenUV - scaleOffset.zw) / scaleOffset.xy;
-                #endif
-
-                //draw our scene depth texture and linearize it
-                fixed linearDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.screenPos)));
+                // Read depth, linearizing into worldspace units.
+                float linearDepth = LinearEyeDepth(UNITY_SAMPLE_DEPTH(tex2D(_CameraDepthTexture, screenUV)));
 
                 //Depth buffer is reversed on Oculus Quest
                 #if UNITY_REVERSED_Z
                     linearDepth = 1.0 - linearDepth;
                 #endif
 
-                //calculate the world position view plane for the camera
-                fixed3 cameraWorldPositionViewPlane = i.camRelativeWorldPos.xyz / dot(i.camRelativeWorldPos.xyz, unity_WorldToCamera._m20_m21_m22);
-
-                //get the world position vector
-                fixed3 worldPos = cameraWorldPositionViewPlane * linearDepth + _WorldSpaceCameraPos;
+                // Scale our view ray to unit depth.
+                float3 direction = i.worldDirection * perspectiveDivide;
+                float3 worldPos = direction * linearDepth + _WorldSpaceCameraPos;
 
                 const fixed transformToLocal = unity_ProbeVolumeParams.y;
                 const fixed texelSizeX = unity_ProbeVolumeParams.z;
 
                 // UV offset by orientation
-                fixed3 localViewDir = normalize(cameraWorldPositionViewPlane);
+                fixed3 localViewDir = normalize(direction);
 
                 //compute jitter
                 fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * _RaymarchJitterStrength;
