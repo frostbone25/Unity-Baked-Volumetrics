@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-namespace BakedVolumetrics
+namespace BakedVolumetricsOffline
 {
     /// <summary>
     /// Point Light (256 BITS | 32 BYTES)

@@ -1,0 +1,85 @@
+#define THREAD_GROUP_SIZE_X 4
+#define THREAD_GROUP_SIZE_Y 4
+#define THREAD_GROUP_SIZE_Z 4
+//64 threads
+
+//https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityCG.cginc
+//From UnityCG.cginc
+#define UNITY_PI            3.14159265359f
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+Texture3D<float4> BufferA;
+Texture3D<float4> BufferB;
+
+RWTexture3D<float4> Write;
+
+float AlbedoBoost;
+
+//||||||||||||||||||||||||||||| ComputeShader_AddBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_AddBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_AddBuffers |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_AddBuffers
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_AddBuffers(uint3 id : SV_DispatchThreadID)
+{
+    float4 addBufferA = BufferA[id.xyz];
+    float4 addBufferB = BufferB[id.xyz];
+    float4 addedBuffers = addBufferA + addBufferB;
+    addedBuffers.a = saturate(addedBuffers.a);
+
+    Write[id.xyz] = addedBuffers;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_MultiplyBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_MultiplyBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_MultiplyBuffers |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_MultiplyBuffers
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_MultiplyBuffers(uint3 id : SV_DispatchThreadID)
+{
+    float4 multiplyBufferA = BufferA[id.xyz];
+    float4 multiplyBufferB = BufferB[id.xyz];
+    float4 multipliedBuffers = multiplyBufferA * multiplyBufferB;
+    multipliedBuffers.a = saturate(multipliedBuffers.a);
+
+    Write[id.xyz] = multipliedBuffers;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_DivideBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_DivideBuffers |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_DivideBuffers |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_DivideBuffers
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_DivideBuffers(uint3 id : SV_DispatchThreadID)
+{
+    float4 divideBufferA = BufferA[id.xyz];
+    float4 divideBufferB = BufferB[id.xyz];
+    float4 dividedBuffers = divideBufferA / divideBufferB;
+    dividedBuffers.a = saturate(dividedBuffers.a);
+
+    Write[id.xyz] = dividedBuffers;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_CombineAlbedoWithLighting |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_CombineAlbedoWithLighting |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_CombineAlbedoWithLighting |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_CombineAlbedoWithLighting
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_CombineAlbedoWithLighting(uint3 id : SV_DispatchThreadID)
+{
+    float4 albedoBuffer = BufferA[id.xyz];
+    float4 lightingBuffer = BufferB[id.xyz];
+
+    //float3 finalColor = lightingBuffer.rgb * (albedoBuffer.rgb) * AlbedoBoost;
+    float3 finalColor = lightingBuffer.rgb * (albedoBuffer.rgb / UNITY_PI) * AlbedoBoost; //energy conserving lambertian BDRF
+
+    Write[id.xyz] = float4(finalColor, albedoBuffer.a);
+
+}

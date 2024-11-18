@@ -1,0 +1,116 @@
+﻿#define THREAD_GROUP_SIZE_X 4
+#define THREAD_GROUP_SIZE_Y 4
+#define THREAD_GROUP_SIZE_Z 4
+//64 threads
+
+#include "UnityCG.cginc"
+
+float Brightness;
+float Contrast;
+float Saturation;
+float Vibrance;
+float HueShift;
+float Gamma;
+float4 ColorFilter;
+float ColorFilterStrength;
+float4 ColorMultiply;
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+Texture3D<float4> VolumetricBase;
+RWTexture3D<float4> VolumetricWrite;
+
+float3 Adjustment_Brightness(float3 color, float amount)
+{
+    return color * amount;
+}
+
+float3 Adjustment_Contrast(float3 color, float amount)
+{
+    return color - amount;
+}
+
+float3 Adjustment_Saturation(float3 color, float amount)
+{
+    float3 luma = Luminance(color);
+
+    return lerp(Luminance(luma), color, 1 + amount);
+}
+
+float3 Adjustment_Vibrance(float3 color, float vibrance)
+{
+    float average = (color.r + color.g + color.b) / 3.0f;
+    float mx = max(color.r, max(color.g, color.b));
+    float amount = (mx - average) * vibrance * 3.0f * 5.0f;
+
+    color = color - (mx - color) * amount;
+
+    return color;
+}
+
+float3 Adjustment_ShiftHue(float3 color, float shift)
+{
+    float3 P = float3(0.55735f, 0.55735f, 0.55735f) * dot(float3(0.55735f, 0.55735f, 0.55735f), color);
+    float3 U = color - P;
+    float3 V = cross(float3(0.55735f, 0.55735f, 0.55735f), U);
+
+    color = U * cos(shift * 6.2832) + V * sin(shift * 6.2832) + P;
+
+    return color;
+}
+
+float3 Adjustment_Gamma(float3 color, float amount)
+{
+    return pow(color, 1.0f / amount);
+}
+
+float3 Adjustment_ColorFilter(float3 color, float3 filter, float amount)
+{
+    float3 luma = Luminance(color);
+    float3 filteredColor = filter * luma;
+
+    return lerp(color, filteredColor, amount);
+}
+
+float3 Adjustment_ColorMultiply(float3 color, float3 newColor)
+{
+    return color * newColor;
+}
+
+#pragma kernel Adjustments
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void Adjustments(uint3 id : SV_DispatchThreadID)
+{
+    float4 originalColor = VolumetricBase[id.xyz];
+    //originalColor = float4(GammaToLinearSpace(originalColor), originalColor.a); //Color Space Correction
+
+    //GAMMA
+    originalColor.rgb = Adjustment_Gamma(originalColor.rgb, Gamma);
+
+    //BRIGHTNESS
+    originalColor.rgb = Adjustment_Brightness(originalColor.rgb, Brightness);
+
+    //CONTRAST
+    originalColor.rgb = Adjustment_Contrast(originalColor.rgb, Contrast);
+
+    //SATURATION
+    originalColor.rgb = Adjustment_Saturation(originalColor.rgb, Saturation);
+
+    //VIBRANCE
+    originalColor.rgb = Adjustment_Vibrance(originalColor.rgb, Vibrance);
+
+    //HUE SHIFT
+    originalColor.rgb = Adjustment_ShiftHue(originalColor.rgb, HueShift);
+
+    //COLOR FILTER
+    originalColor.rgb = Adjustment_ColorFilter(originalColor.rgb, ColorFilter, ColorFilterStrength);
+
+    //COLOR MULTIPLY
+    originalColor.rgb = Adjustment_ColorMultiply(originalColor.rgb, ColorMultiply);
+
+    //originalColor = float4(LinearToGammaSpace(originalColor), originalColor.a); //Color Space Correction
+
+    originalColor = max(0.0f, originalColor);
+
+    VolumetricWrite[id.xyz] = originalColor;
+}

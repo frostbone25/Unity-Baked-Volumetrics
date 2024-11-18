@@ -1353,6 +1353,55 @@ MonoBehaviour:
   volumeSize:
     overrideState: 1
     value: {x: 92, y: 29, z: 62}
+--- !u!114 &-6494781763667994922
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1cb7e9e120078f43bce4f0b1be547a7, type: 3}
+  m_Name: AmbientOcclusion
+  m_EditorClassIdentifier: 
+  active: 1
+  enabled:
+    overrideState: 1
+    value: 1
+  mode:
+    overrideState: 0
+    value: 1
+  intensity:
+    overrideState: 1
+    value: 0.06
+  color:
+    overrideState: 0
+    value: {r: 0, g: 0, b: 0, a: 1}
+  ambientOnly:
+    overrideState: 0
+    value: 1
+  noiseFilterTolerance:
+    overrideState: 0
+    value: 0
+  blurTolerance:
+    overrideState: 0
+    value: -4.6
+  upsampleTolerance:
+    overrideState: 0
+    value: -12
+  thicknessModifier:
+    overrideState: 0
+    value: 1
+  directLightingStrength:
+    overrideState: 0
+    value: 0
+  radius:
+    overrideState: 0
+    value: 0.25
+  quality:
+    overrideState: 0
+    value: 2
 --- !u!114 &-5446852267329444448
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -1453,6 +1502,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   settings:
   - {fileID: -7693575959006385970}
-  - {fileID: -6904380953964002115}
-  - {fileID: -3590662874747151992}
-  - {fileID: -5446852267329444448}
+  - {fileID: -6494781763667994922}

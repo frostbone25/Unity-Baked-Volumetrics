@@ -48,9 +48,9 @@ namespace BakedVolumetrics
         public void CreateVolume()
         {
             GameObject newVolumeGameObject = new GameObject("NewBakedVolume");
-            VolumeGenerator newVolumeScript = newVolumeGameObject.AddComponent<VolumeGenerator>();
-            newVolumeScript.Setup();
-            newVolumeScript.SetupSceneObjectVolume();
+            //VolumeGenerator newVolumeScript = newVolumeGameObject.AddComponent<VolumeGenerator>();
+            //newVolumeScript.Setup();
+            //newVolumeScript.SetupSceneObjectVolume();
         }
     }
 }

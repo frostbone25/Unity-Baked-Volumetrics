@@ -7,153 +7,130 @@ using UnityEditor;
 using System.IO;
 using System;
 using UnityEngine.Experimental.Rendering;
+using Unity.Collections;
 
-namespace BakedVolumetrics
+namespace BakedVolumetricsOffline
 {
     public class RenderTextureConverter
     {
-        public struct TextureObjectSettings
+        private Texture2D convertedTexture2D;
+        private Texture3D convertedTexture3D;
+
+        public Texture2D ConvertRenderTexture2DToTexture2D(RenderTexture renderTexture2D, bool generateMips = false, bool readable = false, bool releaseRenderTexture = false)
         {
-            public TextureWrapMode wrapMode;
-            public FilterMode filterMode;
-            public int anisoLevel;
-            public bool mipMaps;
-        }
+            int width = renderTexture2D.width;
+            int height = renderTexture2D.height;
+            //int renderTextureMemorySize = (int)Profiler.GetRuntimeMemorySizeLong(renderTexture2D);
+            int renderTextureMemorySize = (int)RenderTextureSize.GetRenderTextureMemorySize(renderTexture2D);
 
-        private ComputeShader computeShader;
+            NativeArray<byte> nativeArray = new NativeArray<byte>(renderTextureMemorySize, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
-        private RenderTextureFormat rtFormat;
-        private TextureFormat assetFormat;
-
-        public RenderTextureConverter(ComputeShader computeShader, RenderTextureFormat rtFormat, TextureFormat assetFormat)
-        {
-            this.computeShader = computeShader;
-            this.rtFormat = rtFormat;
-            this.assetFormat = assetFormat;
-        }
-
-        public RenderTextureConverter(RenderTextureFormat rtFormat, TextureFormat assetFormat)
-        {
-            this.rtFormat = rtFormat;
-            this.assetFormat = assetFormat;
-        }
-
-        /// <summary>
-        /// Captures a single slice of the volume we are capturing.
-        /// </summary>
-        /// <param name="source"></param>
-        /// <param name="layer"></param>
-        /// <returns></returns>
-        private RenderTexture GetRenderTextureSlice(RenderTexture source, int layer)
-        {
-            //create a SLICE of the render texture
-            RenderTexture render = new RenderTexture(source.width, source.height, 0, rtFormat);
-
-            //set our options for the render texture SLICE
-            render.dimension = TextureDimension.Tex2D;
-            render.enableRandomWrite = true;
-            render.wrapMode = TextureWrapMode.Clamp;
-            render.Create();
-
-            //find the main function in the slicer shader and start displaying each slice
-            int kernelIndex = computeShader.FindKernel("CSMain");
-            computeShader.SetTexture(kernelIndex, "voxels", source);
-            computeShader.SetInt("layer", layer);
-            computeShader.SetTexture(kernelIndex, "Result", render);
-            computeShader.Dispatch(kernelIndex, source.width, source.height, 1);
-
-            return render;
-        }
-
-        /// <summary>
-        /// Converts a 2D render texture to a Texture2D object.
-        /// </summary>
-        /// <param name="rt"></param>
-        /// <returns></returns>
-        public static Texture2D ConvertFromRenderTexture2D(RenderTexture rt, TextureFormat assetFormat, bool mipChain = false, bool alphaIsTransparency = false)
-        {
-            //create our texture2D object to store the slice
-            Texture2D output = new Texture2D(rt.width, rt.height, assetFormat, mipChain);
-            output.alphaIsTransparency = alphaIsTransparency;
-
-            //make sure the render texture slice is active so we can read from it
-            RenderTexture.active = rt;
-
-            //read the texture and store the data in the texture2D object
-            output.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
-            output.Apply();
-
-            rt.DiscardContents(true, true);
-            rt.Release();
-
-            return output;
-        }
-
-        public Texture3D ConvertFromRenderTexture3D(RenderTexture rt, bool mipChain = false)
-        {
-            RenderTexture[] layers = new RenderTexture[rt.volumeDepth]; //create an array that matches in length the "depth" of the volume
-            Texture2D[] finalSlices = new Texture2D[rt.volumeDepth]; //create another array to store the texture2D versions of the layers array
-
-            for (int i = 0; i < rt.volumeDepth; i++)
+            AsyncGPUReadbackRequest request = AsyncGPUReadback.RequestIntoNativeArray(ref nativeArray, renderTexture2D, 0, (request) =>
             {
-                layers[i] = GetRenderTextureSlice(rt, i);
-            }
+                convertedTexture2D = new Texture2D(width, height, renderTexture2D.graphicsFormat, generateMips ? TextureCreationFlags.MipChain : TextureCreationFlags.None);
+                convertedTexture2D.filterMode = convertedTexture2D.filterMode;
+                convertedTexture2D.SetPixelData(nativeArray, 0);
+                convertedTexture2D.Apply(generateMips, !readable);
 
-            for (int i = 0; i < rt.volumeDepth; i++)
-            {
-                finalSlices[i] = ConvertFromRenderTexture2D(layers[i], assetFormat);
-            }
+                nativeArray.Dispose();
 
-            Texture3D output = new Texture3D(rt.width, rt.height, rt.volumeDepth, assetFormat, mipChain);
-            Color[] outputColors = new Color[rt.width * rt.height * rt.volumeDepth];
+                if(releaseRenderTexture)
+                    renderTexture2D.Release();
+            });
 
-            for (int z = 0; z < rt.volumeDepth; z++)
-            {
-                Texture2D slice = finalSlices[z];
-                Color[] sliceColors = slice.GetPixels();
+            request.WaitForCompletion();
 
-                int startIndex = z * rt.width * rt.height;
-                Array.Copy(sliceColors, 0, outputColors, startIndex, rt.width * rt.height);
-            }
-
-            output.SetPixels(outputColors);
-            output.Apply();
-
-            return output;
+            return convertedTexture2D;
         }
 
-        /// <summary>
-        /// Saves a 3D Render Texture to the disk
-        /// </summary>
-        /// <param name="rt"></param>
-        /// <param name="directory">Realtive to the Assets/, make sure there is a / after. Like 'Textures/'</param>
-        public void Save3D(RenderTexture rt, string assetRelativePath, TextureObjectSettings settings)
+        public void SaveRenderTexture2DAsTexture2D(RenderTexture renderTexture2D, string assetRealtivePath, bool generateMips = false, bool readable = false, bool releaseRenderTexture = false)
         {
-            Texture3D output = ConvertFromRenderTexture3D(rt, settings.mipMaps);
-            output.anisoLevel = settings.anisoLevel;
-            output.wrapMode = settings.wrapMode;
-            output.filterMode = settings.filterMode;
-
-            //AssetDatabase.DeleteAsset(assetRealtivePath);
-            AssetDatabase.CreateAsset(output, assetRelativePath);
-
-            //FIX: reimport asset
-            AssetDatabase.ImportAsset(assetRelativePath);
+            Texture2D converted = ConvertRenderTexture2DToTexture2D(renderTexture2D, generateMips, readable, releaseRenderTexture);
+            AssetDatabase.CreateAsset(converted, assetRealtivePath);
+            AssetDatabase.SaveAssetIfDirty(converted);
         }
 
-        public static Texture3D Duplicate3DTexture(Texture3D source)
+        public void SaveAsyncRenderTexture2DAsTexture2D(RenderTexture renderTexture2D, string assetRealtivePath, bool generateMips = false, bool readable = false)
         {
-            Texture3D duplicate = new Texture3D(source.width, source.height, source.depth, source.format, source.mipmapCount);
-            duplicate.wrapMode = source.wrapMode;
-            duplicate.anisoLevel = source.anisoLevel;
-            duplicate.filterMode = source.filterMode;
+            int width = renderTexture2D.width;
+            int height = renderTexture2D.height;
+            //int renderTextureMemorySize = (int)Profiler.GetRuntimeMemorySizeLong(renderTexture2D);
+            int renderTextureMemorySize = (int)RenderTextureSize.GetRenderTextureMemorySize(renderTexture2D);
 
-            for (int i = 0; i < source.mipmapCount; i++)
+            NativeArray<byte> nativeArray = new NativeArray<byte>(renderTextureMemorySize, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
+            AsyncGPUReadbackRequest request = AsyncGPUReadback.RequestIntoNativeArray(ref nativeArray, renderTexture2D, 0, (request) =>
             {
-                duplicate.SetPixels(source.GetPixels(i), i);
-            }
+                convertedTexture2D = new Texture2D(width, height, renderTexture2D.graphicsFormat, generateMips ? TextureCreationFlags.MipChain : TextureCreationFlags.None);
+                convertedTexture2D.filterMode = convertedTexture2D.filterMode;
+                convertedTexture2D.SetPixelData(nativeArray, 0);
+                convertedTexture2D.Apply(generateMips, !readable);
 
-            return duplicate;
+                nativeArray.Dispose();
+                renderTexture2D.Release();
+
+                AssetDatabase.CreateAsset(convertedTexture2D, assetRealtivePath);
+                AssetDatabase.SaveAssetIfDirty(convertedTexture2D);
+            });
+        }
+
+        public Texture3D ConvertRenderTexture3DToTexture3D(RenderTexture renderTexture3D, bool generateMips = false, bool readable = false, bool releaseRenderTexture = false)
+        {
+            int width = renderTexture3D.width;
+            int height = renderTexture3D.height;
+            int depth = renderTexture3D.volumeDepth;
+            //int renderTextureMemorySize = (int)Profiler.GetRuntimeMemorySizeLong(renderTexture3D);
+            int renderTextureMemorySize = (int)RenderTextureSize.GetRenderTextureMemorySize(renderTexture3D);
+
+            NativeArray<byte> nativeArray = new NativeArray<byte>(renderTextureMemorySize, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
+            AsyncGPUReadbackRequest request = AsyncGPUReadback.RequestIntoNativeArray(ref nativeArray, renderTexture3D, 0, (request) =>
+            {
+                convertedTexture3D = new Texture3D(width, height, depth, renderTexture3D.graphicsFormat, generateMips ? TextureCreationFlags.MipChain : TextureCreationFlags.None);
+                convertedTexture3D.filterMode = renderTexture3D.filterMode;
+                convertedTexture3D.SetPixelData(nativeArray, 0);
+                convertedTexture3D.Apply(generateMips, !readable);
+
+                nativeArray.Dispose();
+
+                if(releaseRenderTexture)
+                    renderTexture3D.Release();
+            });
+
+            request.WaitForCompletion();
+
+            return convertedTexture3D;
+        }
+
+        public void SaveRenderTexture3DAsTexture3D(RenderTexture renderTexture3D, string assetRealtivePath, bool generateMips = false, bool readable = false)
+        {
+            Texture3D converted = ConvertRenderTexture3DToTexture3D(renderTexture3D, generateMips, readable);
+            AssetDatabase.CreateAsset(converted, assetRealtivePath);
+            AssetDatabase.SaveAssetIfDirty(converted);
+        }
+
+        public void SaveRenderTexture3DAsTexture3D(RenderTexture renderTexture3D, string assetRealtivePath, TextureFormat newTextureFormat, bool generateMips = false, bool readable = false)
+        {
+            Texture3D converted = ConvertRenderTexture3DToTexture3D(renderTexture3D, generateMips, readable);
+            Texture3D convertedNewFormat = new Texture3D(converted.width, converted.height, converted.depth, newTextureFormat, false);
+            convertedNewFormat.filterMode = converted.filterMode;
+            convertedNewFormat.wrapMode = converted.wrapMode;
+
+            Graphics.ConvertTexture(converted, convertedNewFormat);
+            AssetDatabase.CreateAsset(convertedNewFormat, assetRealtivePath);
+            AssetDatabase.SaveAssetIfDirty(convertedNewFormat);
+        }
+
+        public void SaveRenderTexture3DAsTexture3D(RenderTexture renderTexture3D, string assetRealtivePath, GraphicsFormat newTextureFormat, bool generateMips = false, bool readable = false)
+        {
+            Texture3D converted = ConvertRenderTexture3DToTexture3D(renderTexture3D, generateMips, readable);
+            Texture3D convertedNewFormat = new Texture3D(converted.width, converted.height, converted.depth, newTextureFormat, generateMips ? TextureCreationFlags.MipChain : TextureCreationFlags.None);
+            convertedNewFormat.filterMode = converted.filterMode;
+            convertedNewFormat.wrapMode = converted.wrapMode;
+
+            Graphics.ConvertTexture(converted, convertedNewFormat);
+            AssetDatabase.CreateAsset(convertedNewFormat, assetRealtivePath);
+            AssetDatabase.SaveAssetIfDirty(convertedNewFormat);
         }
     }
 }

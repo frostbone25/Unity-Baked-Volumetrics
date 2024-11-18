@@ -1,0 +1,61 @@
+﻿#define THREAD_GROUP_SIZE_X 8
+#define THREAD_GROUP_SIZE_Y 8
+#define THREAD_GROUP_SIZE_Z 8
+
+#include "MetaPassPacking.cginc"
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+#pragma multi_compile_local _ EMISSION_HDR_RGBM
+#pragma multi_compile_local _ EMISSION_HDR_RGBD
+#pragma multi_compile_local _ EMISSION_HDR_RGBE
+#pragma multi_compile_local _ EMISSION_HDR_LOG_LUV_32
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+RWTexture2D<float4> PackedBuffer;
+RWTexture2D<float4> AlbedoBuffer;
+RWTexture2D<float4> EmissiveBuffer;
+RWTexture2D<float4> NormalBuffer;
+RWTexture2D<float4> Write;
+
+//||||||||||||||||||||||||||||| ComputeShader_DataPacking64 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_DataPacking64 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_DataPacking64 |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_DataPacking64
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_DataPacking64(uint2 id : SV_DispatchThreadID)
+{
+    float4 albedoColor = AlbedoBuffer[id.xy];
+    float4 emissiveColor = EmissiveBuffer[id.xy];
+    //float4 normalColor = NormalBuffer[id.xy];
+    float4 normalColor = float4(0, 0, 0, 0);
+
+    Write[id.xy] = PackMetaBuffer(albedoColor, emissiveColor.rgb, normalColor.rgb);
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_DataUnpacking64 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_DataUnpacking64 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_DataUnpacking64 |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_DataUnpacking64
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_DataUnpacking64(uint2 id : SV_DispatchThreadID)
+{
+    float4 packedBuffer64 = PackedBuffer[id.xy];
+
+    float4 albedoColor = float4(0, 0, 0, 0);
+    float4 emissiveColor = float4(0, 0, 0, 0);
+    float4 normalColor = float4(0, 0, 0, 0);
+    
+    UnpackMetaBuffer(packedBuffer64, albedoColor, emissiveColor, normalColor);
+    
+    AlbedoBuffer[id.xy] = albedoColor;
+    NormalBuffer[id.xy] = normalColor;
+    EmissiveBuffer[id.xy] = emissiveColor;
+}

@@ -2,19 +2,28 @@
 //UnityCG.cginc - https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityCG.cginc
 //UnityShaderVariables.cginc - https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityShaderVariables.cginc
 
-Shader "SceneVolumetricFog_LPPV"
+Shader "BakedVolumetrics/SceneVolumetricFog_LPPV"
 {
     Properties
     {
-        [Header(Raymarching)]
-        _RaymarchStepSize("Raymarch Step Size", Float) = 25
+        [Header(Volume)]
+        _VolumePos("Volume World Position", Vector) = (0, 0, 0, 0)
+        _VolumeSize("Volume World Size", Vector) = (0, 0, 0, 0)
+
+        [Header(Density)]
+        [Toggle(_USE_DENSITY_TEXTURE)] _UseDensityTexture("Use Density Texture", Float) = 0
+        _DensityVolumeTexture("Density Texture", 3D) = "white" {}
 
         [Header(Rendering)]
+        [Enum(UnityEngine.Rendering.CullMode)] _CullMode("Cull Mode", Int) = 1 //(0 = Default | 1 = Front | 2 = Back)
+        [KeywordEnum(_8, _16, _24, _32, _48, _64, _128)] _Samples("Samples", Float) = 3
+        _RaymarchStepSize("Raymarch Step Size", Float) = 25
         [Toggle(_HALF_RESOLUTION)] _HalfResolution("Half Resolution", Float) = 0
+        [Toggle(_TERMINATE_RAYS_OUTSIDE_VOLUME)] _TerminateRaysOutsideVolume("Terminate Rays Outside Volume", Float) = 1
+        [Toggle(_KEEP_RAYS_ONLY_IN_VOLUME)] _RaysOnlyInVolume("Trace Rays Only In Volume", Float) = 1
         [Toggle(_ANIMATED_NOISE)] _EnableAnimatedJitter("Animated Noise", Float) = 0
-        [Toggle(_KILL_RAYS_EXITING_VOLUME)] _StopRaysExitingVolume("Kill Rays Exiting Volume", Float) = 1
         _JitterTexture("Jitter Texture", 2D) = "white" {}
-        _RaymarchJitterStrength("Raymarch Jitter", Float) = 2
+        _JitterStrength("Jitter Strength", Float) = 2
     }
 
     SubShader
@@ -25,7 +34,7 @@ Shader "SceneVolumetricFog_LPPV"
             "Queue" = "Transparent+2000" 
         }
 
-        Cull Off
+        Cull [_CullMode]
         ZWrite Off
         ZTest Off
         Blend SrcAlpha OneMinusSrcAlpha
@@ -33,19 +42,35 @@ Shader "SceneVolumetricFog_LPPV"
         Pass
         {
             CGPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
+            #pragma vertex vertex_base
+            #pragma fragment fragment_base
 
+            //||||||||||||||||||||||||||||| INCLUDES |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| INCLUDES |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| INCLUDES |||||||||||||||||||||||||||||
+
+            //Unity3d
+            #include "UnityCG.cginc"
+
+            //Custom (From Pema)
+            #include "QuadIntrinsics.cginc"
+
+            //||||||||||||||||||||||||||||| KEYWORDS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| KEYWORDS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| KEYWORDS |||||||||||||||||||||||||||||
+
+            //Unity3d
             #pragma multi_compile_instancing  
-            #pragma multi_compile SAMPLES_8 SAMPLES_16 SAMPLES_24 SAMPLES_32 SAMPLES_48 SAMPLES_64 SAMPLES_128
             #pragma multi_compile _ UNITY_LIGHT_PROBE_PROXY_VOLUME 
+
+            //Custom
+            #pragma multi_compile _SAMPLES__8 _SAMPLES__16 _SAMPLES__24 _SAMPLES__32 _SAMPLES__48 _SAMPLES__64 _SAMPLES__128
 
             #pragma shader_feature_local _ANIMATED_NOISE
             #pragma shader_feature_local _HALF_RESOLUTION
-            #pragma shader_feature_local _KILL_RAYS_EXITING_VOLUME
-
-            #include "UnityCG.cginc"
-            #include "QuadIntrinsics.cginc"
+            #pragma shader_feature_local _TERMINATE_RAYS_OUTSIDE_VOLUME
+            #pragma shader_feature_local _KEEP_RAYS_ONLY_IN_VOLUME
+            #pragma shader_feature_local _USE_DENSITY_TEXTURE
 
             //NOTE: IF MIP QUAD OPTIMIZATION IS ENABLED
             //WE HAVE TO TARGET 5.0
@@ -73,50 +98,52 @@ Shader "SceneVolumetricFog_LPPV"
                 //#pragma require framebufferfetch
             #endif
 
-            ///*
-            #ifdef SAMPLES_8
-                #define _RaymarchSteps 8
-            #elif SAMPLES_16
-                #define _RaymarchSteps 16
-            #elif SAMPLES_24
-                #define _RaymarchSteps 24
-            #elif SAMPLES_32
-                #define _RaymarchSteps 32
-            #elif SAMPLES_48
-                #define _RaymarchSteps 48
-            #elif SAMPLES_64
-                #define _RaymarchSteps 64
-            #elif SAMPLES_128
-                #define _RaymarchSteps 128
+            //||||||||||||||||||||||||||||| MACROS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| MACROS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| MACROS |||||||||||||||||||||||||||||
+
+            //#define UseInstancedProps
+
+            #ifdef _SAMPLES__8
+                #define RAYMARCH_STEPS 8
+            #elif _SAMPLES__16
+                #define RAYMARCH_STEPS 16
+            #elif _SAMPLES__24
+                #define RAYMARCH_STEPS 24
+            #elif _SAMPLES__32
+                #define RAYMARCH_STEPS 32
+            #elif _SAMPLES__48
+                #define RAYMARCH_STEPS 48
+            #elif _SAMPLES__64
+                #define RAYMARCH_STEPS 64
+            #elif _SAMPLES__128
+                #define RAYMARCH_STEPS 128
             #else
-                #define _RaymarchSteps 32
+                #define RAYMARCH_STEPS 32
             #endif
-            //*/
 
-            struct appdata
-            {
-                fixed4 vertex : POSITION;
-
-                //Single Pass Instanced Support
-                UNITY_VERTEX_INPUT_INSTANCE_ID 
-            };
-
-            struct vertexToFragment
-            {
-                fixed4 vertex : SV_POSITION;
-                fixed4 screenPos : TEXCOORD0;
-                fixed3 camRelativeWorldPos : TEXCOORD1;
-
-                //Single Pass Instanced Support
-                UNITY_VERTEX_OUTPUT_STEREO
-            };
+            //||||||||||||||||||||||||||||| SHADER PARAMETERS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| SHADER PARAMETERS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| SHADER PARAMETERS |||||||||||||||||||||||||||||
 
             fixed _RaymarchStepSize;
-            fixed _RaymarchJitterStrength;
+            fixed _JitterStrength;
+
+            fixed4 _VolumePos;
+            fixed4 _VolumeSize;
+
             fixed4 _JitterTexture_TexelSize;
             fixed4 _CameraDepthTexture_TexelSize;
+
             sampler2D_half _JitterTexture;
+
+            sampler3D _DensityVolumeTexture;
+
             UNITY_DECLARE_SCREENSPACE_TEXTURE(_CameraDepthTexture);
+
+            //||||||||||||||||||||||||||||| METHODS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| METHODS |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| METHODS |||||||||||||||||||||||||||||
 
             #if defined (_ANIMATED_NOISE)
                 //animated noise courtesy of silent
@@ -152,29 +179,63 @@ Shader "SceneVolumetricFog_LPPV"
                 }
             #endif
 
-            vertexToFragment vert(appdata v)
+            //||||||||||||||||||||||||||||| MESH DATA STRUCT |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| MESH DATA STRUCT |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| MESH DATA STRUCT |||||||||||||||||||||||||||||
+
+            struct meshData
             {
-                vertexToFragment o;
+                fixed4 vertex : POSITION; //Vertex Position (X = Position X | Y = Position Y | Z = Position Z | W = 1)
 
                 //Single Pass Instanced Support
-                UNITY_SETUP_INSTANCE_ID(v);
-                UNITY_INITIALIZE_OUTPUT(vertexToFragment, o);
-                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
 
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.screenPos = UnityStereoTransformScreenSpaceTex(ComputeScreenPos(o.vertex));
-                o.camRelativeWorldPos = mul(unity_ObjectToWorld, fixed4(v.vertex.xyz, 1.0)).xyz - _WorldSpaceCameraPos;
+            //||||||||||||||||||||||||||||| VERTEX TO FRAGMENT STRUCT |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| VERTEX TO FRAGMENT STRUCT |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| VERTEX TO FRAGMENT STRUCT |||||||||||||||||||||||||||||
 
-                return o;
+            struct vertexToFragment
+            {
+                fixed4 vertexCameraClipPosition : SV_POSITION; //Vertex Position In Camera Clip Space
+                fixed4 screenPosition : TEXCOORD0; //Screen Position
+                fixed3 cameraRelativeWorldPosition : TEXCOORD1; 
+
+                //Single Pass Instanced Support
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            //||||||||||||||||||||||||||||| VERTEX FUNCTION |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| VERTEX FUNCTION |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| VERTEX FUNCTION |||||||||||||||||||||||||||||
+
+            vertexToFragment vertex_base(meshData data)
+            {
+                vertexToFragment vertex;
+
+                //Single Pass Instanced Support
+                UNITY_SETUP_INSTANCE_ID(data);
+                UNITY_INITIALIZE_OUTPUT(vertexToFragment, vertex);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(vertex);
+
+                vertex.vertexCameraClipPosition = UnityObjectToClipPos(data.vertex);
+                vertex.screenPosition = ComputeScreenPos(vertex.vertexCameraClipPosition);
+                vertex.cameraRelativeWorldPosition = mul(unity_ObjectToWorld, fixed4(data.vertex.xyz, 1.0)).xyz - _WorldSpaceCameraPos;
+
+                return vertex;
             }
 
-            fixed4 frag(vertexToFragment i) : SV_Target
+            //||||||||||||||||||||||||||||| FRAGMENT FUNCTION |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| FRAGMENT FUNCTION |||||||||||||||||||||||||||||
+            //||||||||||||||||||||||||||||| FRAGMENT FUNCTION |||||||||||||||||||||||||||||
+
+            fixed4 fragment_base(vertexToFragment vertex) : SV_Target
             {
                 //Single Pass Instanced Support
-                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(vertex);
 
                 #if defined (_HALF_RESOLUTION)
-                    SETUP_QUAD_INTRINSICS(i.vertex)
+                    SETUP_QUAD_INTRINSICS(vertex.vertexCameraClipPosition)
                 #endif
 
                 //our final computed fog color
@@ -186,8 +247,7 @@ Shader "SceneVolumetricFog_LPPV"
                 #endif
 
                 //get our screen uv coords
-                fixed2 screenUV = i.screenPos.xy / i.screenPos.w;
-
+                fixed2 screenUV = vertex.screenPosition.xy / vertex.screenPosition.w;
 
                 #if UNITY_UV_STARTS_AT_TOP
                     if (_CameraDepthTexture_TexelSize.y < 0)
@@ -202,15 +262,10 @@ Shader "SceneVolumetricFog_LPPV"
                 #endif
 
                 //draw our scene depth texture and linearize it
-                fixed linearDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.screenPos)));
-
-                //Depth buffer is reversed on Oculus Quest
-                #if UNITY_REVERSED_Z
-                    linearDepth = 1.0 - linearDepth;
-                #endif
+                fixed linearDepth = LinearEyeDepth(SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(vertex.screenPosition)));
 
                 //calculate the world position view plane for the camera
-                fixed3 cameraWorldPositionViewPlane = i.camRelativeWorldPos.xyz / dot(i.camRelativeWorldPos.xyz, unity_WorldToCamera._m20_m21_m22);
+                fixed3 cameraWorldPositionViewPlane = vertex.cameraRelativeWorldPosition.xyz / dot(vertex.cameraRelativeWorldPosition.xyz, unity_WorldToCamera._m20_m21_m22);
 
                 //get the world position vector
                 fixed3 worldPos = cameraWorldPositionViewPlane * linearDepth + _WorldSpaceCameraPos;
@@ -222,35 +277,42 @@ Shader "SceneVolumetricFog_LPPV"
                 fixed3 localViewDir = normalize(cameraWorldPositionViewPlane);
 
                 //compute jitter
-                fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * _RaymarchJitterStrength;
+                fixed jitter = 1.0f + noise(screenUV + length(localViewDir)) * _RaymarchStepSize * _JitterStrength;
 
                 #if defined (_HALF_RESOLUTION)
                     jitter *= 2.0f;
                 #endif
 
                 //get our ray increment vector that we use so we can march into the scene. Jitter it also so we can mitigate banding/stepping artifacts
-                fixed3 raymarch_rayIncrement = normalize(i.camRelativeWorldPos.xyz) / _RaymarchSteps;
+                fixed3 raymarch_rayIncrement = normalize(vertex.cameraRelativeWorldPosition.xyz) / RAYMARCH_STEPS;
 
                 //get the length of the step
                 fixed stepLength = length(raymarch_rayIncrement);
+
+                fixed3 halfVolumeSize = _VolumeSize * 0.5;
 
                 //get our starting ray position from the camera
                 fixed3 raymarch_currentPos = _WorldSpaceCameraPos + raymarch_rayIncrement * jitter;
 
                 //start marching
-                [unroll(_RaymarchSteps)]
-                for (int i = 0; i < _RaymarchSteps; i++)
+                for (int i = 0; i < RAYMARCH_STEPS; i++)
                 {
                     //get the distances of the ray and the world position
-                    fixed distanceRay = distance(_WorldSpaceCameraPos, raymarch_currentPos);
-                    fixed distanceWorld = distance(_WorldSpaceCameraPos, worldPos);
+                    float raymarchRayDistance = distance(_WorldSpaceCameraPos, raymarch_currentPos);
+                    float sceneRayDistance = distance(_WorldSpaceCameraPos, worldPos);
 
-                    //make sure we are within our little box
-                    //if (scaledPos.x < 1.0f && scaledPos.x > 0.0f && scaledPos.y < 1.0f && scaledPos.y > 0.0f && scaledPos.z < 1.0f && scaledPos.z > 0.0f)
-                        
                     //IMPORTANT: Check the current position distance of our ray compared to where we started.
                     //If our distance is less than that of the world then that means we aren't intersecting into any objects yet so keep accumulating.
-                    if (distanceRay < distanceWorld)
+                    bool isRayPositionIntersectingScene = raymarchRayDistance < sceneRayDistance;
+
+                    #if defined(_KEEP_RAYS_ONLY_IN_VOLUME)
+                        //make sure we are within our little box
+                        bool isInBox = all(abs(raymarch_currentPos - VOLUME_POS) < halfVolumeSize);
+
+                        if (isRayPositionIntersectingScene && isInBox)
+                    #else
+                        if (isRayPositionIntersectingScene)
+                    #endif
                     {
                         //And also keep going if we haven't reached the fullest density just yet.
                         if (result.a < 1.0f)
@@ -285,13 +347,19 @@ Shader "SceneVolumetricFog_LPPV"
                             fixed3 sampledColor = fixed3(dot(sphericalHarmonics_A_R, dotDirection), dot(sphericalHarmonics_A_G, dotDirection), dot(sphericalHarmonics_A_B, dotDirection));
                             sampledColor = max(0.0, sampledColor);
 
-                            //accumulate the samples
-                            result += fixed4(sampledColor.rgb, 1.0f) * stepLength; //this is slightly cheaper                                    
+                            #if defined (_USE_DENSITY_TEXTURE)
+                                fixed3 scaledPos = ((raymarch_currentPos - _VolumePos) + halfVolumeSize) / _VolumeSize;
+                                float alpha = tex3Dlod(_DensityVolumeTexture, fixed4(scaledPos, 0)).r;
+
+                                result += fixed4(sampledColor.rgb, alpha) * stepLength; //this is slightly cheaper                 
+                            #else
+                                result += fixed4(sampledColor.rgb, 1.0f) * stepLength; //this is slightly cheaper                 
+                            #endif                               
                         }
                         else
                             break; //terminante the ray 
                     }
-                    #if defined(_KILL_RAYS_EXITING_VOLUME)
+                    #if defined(_TERMINATE_RAYS_OUTSIDE_VOLUME)
                         else
                             break; //terminate the ray
                     #endif

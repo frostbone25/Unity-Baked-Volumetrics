@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace BakedVolumetrics
+namespace BakedVolumetricsOffline
 {
     public static class NoiseLibrary
     {

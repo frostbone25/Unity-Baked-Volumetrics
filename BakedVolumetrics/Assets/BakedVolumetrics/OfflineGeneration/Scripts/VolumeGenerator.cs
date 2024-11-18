@@ -10,8 +10,9 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Profiling;
+using System.Diagnostics.Contracts;
 
-namespace BakedVolumetrics
+namespace BakedVolumetricsOffline
 {
     public class VolumeGenerator : MonoBehaviour
     {
@@ -27,6 +28,8 @@ namespace BakedVolumetrics
         public VoxelCalculation voxelCalculation = VoxelCalculation.Automatic;
         public Vector3Int customVolumeResolution = new Vector3Int(16, 16, 16);
         public float voxelDensitySize = 1.0f;
+        public bool seperateDensityTexture = false;
+        public bool useDensityTextureForLPPV = false;
 
         public Vector3 volumeSize = new Vector3(10.0f, 10.0f, 10.0f);
 
@@ -40,24 +43,46 @@ namespace BakedVolumetrics
         public float densityBottom = 1.0f;
         public float densityHeight = 0.0f;
         public float densityHeightFallof = 1.0f;
+        public float densityLuminanceMultiplier = 1.0f;
         public bool densityInvertLuminance = false;
 
+        public bool postAdjustments;
+        public float brightness = 1.0f;
+        public float contrast = 0.0f;
+        public float saturation = 0.0f;
+        public float vibrance = 0.0f;
+        public float hueShift = 0.0f;
+        public float gamma = 1.0f;
+        public float colorFilterAmount;
+        public Color colorFilter = Color.white;
+        public Color colorMultiply = Color.white;
+
+        //[SerializeField]
+        //[SerializeReference]
         public SampleLightprobe sampleLightprobe;
+
+        //[SerializeField]
+        //[SerializeReference]
         public SampleVoxelTracer sampleVoxelTracer;
 
         public float volumeLightProbeGroupDensityMultiplier = 1;
+        [HideInInspector] public Bounds voxelBounds => new Bounds(transform.position, volumeSize);
 
         //|||||||||||||||||||||||||||||||||||||||||| PRIVATE VARIABLES ||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||| PRIVATE VARIABLES ||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||| PRIVATE VARIABLES ||||||||||||||||||||||||||||||||||||||||||
 
-        private UnityEngine.SceneManagement.Scene activeScene => EditorSceneManager.GetActiveScene();
+        private VolumeGeneratorAssets volumeGeneratorAssets;
+        private RenderTextureConverter renderTextureConverter;
 
-        private string localAssetFolder = "Assets/BakedVolumetrics";
-        private string localAssetDataFolder => localAssetFolder + "/Data";
-        private string localAssetSceneDataFolder => localAssetDataFolder + "/" + activeScene.name;
-        private string fogMaterialAssetPath => localAssetSceneDataFolder + "/" + string.Format("{0}.mat", volumeName);
-        private string fogMaterialLPPVAssetPath => localAssetSceneDataFolder + "/" + string.Format("{0}_LPPV.mat", volumeName);
+        private string finalVolumeAssetPath => string.Format("{0}/{1}.asset", volumeGeneratorAssets.localAssetSceneDataFolder, volumeName);
+        private string finalVolumeDensityAssetPath => string.Format("{0}/{1}_Density.asset", volumeGeneratorAssets.localAssetSceneDataFolder, volumeName);
+        private string fogMaterialAssetPath => string.Format("{0}/{1}.mat", volumeGeneratorAssets.localAssetSceneDataFolder, volumeName);
+        private string fogMaterialLPPVAssetPath => string.Format("{0}/{1}_LPPV.mat", volumeGeneratorAssets.localAssetSceneDataFolder, volumeName);
+
+        private uint THREAD_GROUP_SIZE_X = 0;
+        private uint THREAD_GROUP_SIZE_Y = 0;
+        private uint THREAD_GROUP_SIZE_Z = 0;
 
         private GameObject fogSceneObject;
         private MeshRenderer fogMeshRenderer;
@@ -77,7 +102,7 @@ namespace BakedVolumetrics
 
         public long GetVolumeSpaceUsage()
         {
-            Texture3D volumeAsset = GetVolumeTexture();
+            Texture3D volumeAsset = GetFinalVolume();
 
             if (volumeAsset == null)
                 return 0;
@@ -85,111 +110,81 @@ namespace BakedVolumetrics
                 return Profiler.GetRuntimeMemorySizeLong(volumeAsset);
         }
 
+        public Texture3D GetGeneratedVolume()
+        {
+            if (lightingSource == LightingSource.LightProbes)
+                return sampleLightprobe.GetFinalGeneratedVolume();
+            else if (lightingSource == LightingSource.VoxelTracer)
+                return sampleVoxelTracer.GetFinalGeneratedVolume();
+            else
+                return null;
+        }
+
+        public Texture3D GetFinalVolume() => AssetDatabase.LoadAssetAtPath<Texture3D>(finalVolumeAssetPath);
+
+        public Texture3D GetDensityVolume() => AssetDatabase.LoadAssetAtPath<Texture3D>(finalVolumeDensityAssetPath);
+
+        public TextureFormat GetTextureFormat()
+        {
+            switch (volumeBitDepth)
+            {
+                case VolumeBitDepth.RGB8:
+                    return TextureFormat.RGB24;
+                case VolumeBitDepth.RGBA8:
+                    return TextureFormat.RGBA32;
+                case VolumeBitDepth.RGBA16:
+                    return TextureFormat.RGBAHalf;
+                case VolumeBitDepth.RGBA32:
+                    return TextureFormat.RGBAFloat;
+                default:
+                    return TextureFormat.RGBAHalf;
+            }
+        }
+
+        public RenderTextureFormat GetRenderTextureFormat()
+        {
+            switch (volumeBitDepth)
+            {
+                case VolumeBitDepth.RGB8:
+                    return RenderTextureFormat.ARGB32;
+                case VolumeBitDepth.RGBA8:
+                    return RenderTextureFormat.ARGB32;
+                case VolumeBitDepth.RGBA16:
+                    return RenderTextureFormat.ARGBHalf;
+                case VolumeBitDepth.RGBA32:
+                    return RenderTextureFormat.ARGBFloat;
+                default:
+                    return RenderTextureFormat.ARGBHalf;
+            }
+        }
+
+        public Texture3D GetEmptyVolumeTexture() => new Texture3D(GetVoxelResolution().x, GetVoxelResolution().y, GetVoxelResolution().z, TextureFormat.RGBA32, false);
+
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| SETUP ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
         public void Setup()
         {
-            sampleLightprobe = gameObject.GetComponent<SampleLightprobe>();
-            sampleVoxelTracer = gameObject.GetComponent<SampleVoxelTracer>();
+            if (volumeGeneratorAssets == null)
+                volumeGeneratorAssets = new VolumeGeneratorAssets();
 
             if (sampleLightprobe == null)
-                sampleLightprobe = gameObject.AddComponent<SampleLightprobe>();
+                sampleLightprobe = new SampleLightprobe(this, volumeGeneratorAssets);
 
             if (sampleVoxelTracer == null)
-                sampleVoxelTracer = gameObject.AddComponent<SampleVoxelTracer>();
+                sampleVoxelTracer = new SampleVoxelTracer(this, volumeGeneratorAssets);
+
+            if (renderTextureConverter == null)
+                renderTextureConverter = new RenderTextureConverter();
 
             CalculateResolution();
         }
 
-        public bool PrepareAssetFolders()
-        {
-            //check if there is a data folder, if not then create one
-            if (AssetDatabase.IsValidFolder(localAssetDataFolder) == false)
-                AssetDatabase.CreateFolder(localAssetFolder, "Data");
-
-            if (activeScene.IsValid() == false || string.IsNullOrEmpty(activeScene.path))
-            {
-                string message = "Scene is not valid! Be sure to save the scene before you setup volumetrics for it!";
-                EditorUtility.DisplayDialog("Error", message, "OK");
-                Debug.LogError(message);
-                return false;
-            }
-
-            //check if there is a folder sharing the scene name, if there isn't then create one
-            if (AssetDatabase.IsValidFolder(localAssetSceneDataFolder) == false)
-                AssetDatabase.CreateFolder(localAssetDataFolder, activeScene.name);
-
-            return true;
-        }
-
-        public Material GetVolumeMaterial()
-        {
-            bool prepareAssetFoldersResult = PrepareAssetFolders();
-
-            if (prepareAssetFoldersResult == false)
-                return null;
-
-            //try loading one at the path
-            fogMaterial = AssetDatabase.LoadAssetAtPath<Material>(fogMaterialAssetPath);
-
-            //if there is no material, create one
-            if (fogMaterial == null)
-            {
-                fogMaterial = new Material(Shader.Find("SceneVolumetricFog"));
-                AssetDatabase.CreateAsset(fogMaterial, fogMaterialAssetPath);
-            }
-
-            //setup noise
-            fogMaterial.SetTexture("_JitterTexture", NoiseLibrary.GetBlueNoise());
-
-            return fogMaterial;
-        }
-
-        public Material GetVolume_LPPV_Material()
-        {
-            bool prepareAssetFoldersResult = PrepareAssetFolders();
-
-            if (prepareAssetFoldersResult == false)
-                return null;
-
-            //try loading one at the path
-            fogMaterialLPPV = AssetDatabase.LoadAssetAtPath<Material>(fogMaterialLPPVAssetPath);
-
-            //if there is no material, create one
-            if (fogMaterialLPPV == null)
-            {
-                fogMaterialLPPV = new Material(Shader.Find("SceneVolumetricFog_LPPV"));
-                AssetDatabase.CreateAsset(fogMaterialLPPV, fogMaterialLPPVAssetPath);
-            }
-
-            //setup noise
-            fogMaterialLPPV.SetTexture("_JitterTexture", NoiseLibrary.GetBlueNoise());
-
-            return fogMaterialLPPV;
-        }
-
-        public Texture3D GetVolumeTexture()
-        {
-            if(lightingSource == LightingSource.LightProbes)
-            {
-                return sampleLightprobe.GetGeneratedVolume();
-            }
-            else if (lightingSource == LightingSource.VoxelTracer)
-            {
-                return sampleVoxelTracer.GetGeneratedVolume();
-            }
-            else
-            {
-                return null;
-            }
-        }
-
         public void SetupSceneObjectVolume()
         {
-            fogMaterial = GetVolumeMaterial();
-            fogMaterialLPPV = GetVolume_LPPV_Material();
+            fogMaterial = volumeGeneratorAssets.GetVolumeMaterial(volumeName);
+            fogMaterialLPPV = volumeGeneratorAssets.GetVolume_LPPV_Material(volumeName);
 
             //if there is no scene object, try finding one
             if (fogSceneObject == null)
@@ -226,11 +221,49 @@ namespace BakedVolumetrics
 
         public void GenerateVolume()
         {
-            if (lightingSource == LightingSource.LightProbeProxyVolume)
-                return;
+            volumeGeneratorAssets.PrepareAssetFolders();
+            volumeGeneratorAssets.GetResources();
 
-            if(lightingSource == LightingSource.LightProbes)
-                sampleLightprobe.GenerateVolume(volumeResolution, volumeSize);
+            if(lightingSource != LightingSource.LightProbeProxyVolume)
+            {
+                if (lightingSource == LightingSource.LightProbes)
+                    sampleLightprobe.GenerateVolume();
+                else if (lightingSource == LightingSource.VoxelTracer)
+                    sampleVoxelTracer.GenerateVolume();
+
+                Texture3D generatedVolume = GetGeneratedVolume();
+
+                if (postAdjustments)
+                    ApplyAdjustments(generatedVolume);
+
+                ApplyDensity(postAdjustments ? GetFinalVolume() : generatedVolume, seperateDensityTexture);
+            }
+            else
+            {
+                lightProbeProxyVolume = transform.GetComponentInChildren<LightProbeProxyVolume>();
+
+                if (lightProbeProxyVolume == null)
+                {
+                    GameObject newGameObject = new GameObject("Light Probe Proxy Volume");
+
+                    newGameObject.transform.SetParent(transform);
+                    newGameObject.transform.localPosition = Vector3.zero;
+
+                    lightProbeProxyVolume = newGameObject.AddComponent<LightProbeProxyVolume>();
+                }
+
+                volumeGeneratorAssets.GetResources();
+
+                lightProbeProxyVolume.transform.localScale = volumeSize;
+                lightProbeProxyVolume.boundingBoxMode = LightProbeProxyVolume.BoundingBoxMode.AutomaticLocal;
+                lightProbeProxyVolume.probePositionMode = LightProbeProxyVolume.ProbePositionMode.CellCorner;
+                lightProbeProxyVolume.refreshMode = LightProbeProxyVolume.RefreshMode.EveryFrame;
+                lightProbeProxyVolume.qualityMode = LightProbeProxyVolume.QualityMode.Normal;
+                lightProbeProxyVolume.dataFormat = LightProbeProxyVolume.DataFormat.Float;
+                lightProbeProxyVolume.probeDensity = voxelDensitySize;
+
+                ApplyDensity(GetEmptyVolumeTexture(), useDensityTextureForLPPV);
+            }
 
             UpdateMaterial();
         }
@@ -241,130 +274,73 @@ namespace BakedVolumetrics
 
         public void UpdateMaterial()
         {
-            if(lightingSource == LightingSource.LightProbeProxyVolume)
+            //if there is no scene object, try finding one
+            if (fogSceneObject == null)
             {
-                fogMaterialLPPV = GetVolumeMaterial();
+                if (transform.childCount > 0)
+                    fogSceneObject = transform.GetChild(0).gameObject;
+            }
+
+            if (fogMeshRenderer == null)
+                fogMeshRenderer = fogSceneObject.GetComponent<MeshRenderer>();
+
+            if (lightingSource == LightingSource.LightProbeProxyVolume)
+            {
+                fogMaterialLPPV = volumeGeneratorAssets.GetVolume_LPPV_Material(volumeName);
 
                 if(fogMaterialLPPV == null)
-                {
                     return;
-                }
 
-                UpdateMaterialKeywords();
+                fogMeshRenderer.lightProbeProxyVolumeOverride = lightProbeProxyVolume.gameObject;
+                fogMeshRenderer.lightProbeUsage = LightProbeUsage.UseProxyVolume;
+                fogMeshRenderer.sharedMaterial = fogMaterialLPPV;
 
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_SAMPLES__8", raymarchSamples == RaymarchSamples._8);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_SAMPLES__16", raymarchSamples == RaymarchSamples._16);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_SAMPLES__24", raymarchSamples == RaymarchSamples._24);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_SAMPLES__32", raymarchSamples == RaymarchSamples._32);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_SAMPLES__48", raymarchSamples == RaymarchSamples._48);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_SAMPLES__64", raymarchSamples == RaymarchSamples._64);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_SAMPLES__128", raymarchSamples == RaymarchSamples._128);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterialLPPV, "_USE_DENSITY_TEXTURE", useDensityTextureForLPPV);
+
+                fogMaterialLPPV.SetInt("_Samples", (int)raymarchSamples);
+                fogMaterialLPPV.SetInt("_UseDensityTexture", useDensityTextureForLPPV ? 1 : 0);
+                fogMaterialLPPV.SetVector("_VolumePos", new Vector4(transform.position.x, transform.position.y, transform.position.z, 0.0f));
+                fogMaterialLPPV.SetVector("_VolumeSize", new Vector4(volumeSize.x, volumeSize.y, volumeSize.z, 0.0f));
                 fogMaterialLPPV.SetTexture("_JitterTexture", NoiseLibrary.GetBlueNoise());
-
-                fogSceneObject.transform.localScale = Vector3.one * volumeSize.magnitude * 1.5f;
+                fogMaterialLPPV.SetTexture("_DensityVolumeTexture", useDensityTextureForLPPV ? GetDensityVolume() : null);
             }   
             else
             {
-                //if there is no scene object, try finding one
-                if (fogSceneObject == null)
-                {
-                    if (transform.childCount > 0)
-                        fogSceneObject = transform.GetChild(0).gameObject;
-                }
-
-                if (fogMeshRenderer == null)
-                {
-                    fogMeshRenderer = fogSceneObject.GetComponent<MeshRenderer>();
-                }
-
-                fogMaterial = GetVolumeMaterial();
+                fogMaterial = volumeGeneratorAssets.GetVolumeMaterial(volumeName);
 
                 if (fogMaterial == null)
-                {
                     return;
-                }
 
                 fogMeshRenderer.lightProbeProxyVolumeOverride = null;
                 fogMeshRenderer.lightProbeUsage = LightProbeUsage.Off;
-                fogMeshRenderer.material = fogMaterial;
+                fogMeshRenderer.sharedMaterial = fogMaterial;
 
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_SAMPLES__8", raymarchSamples == RaymarchSamples._8);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_SAMPLES__16", raymarchSamples == RaymarchSamples._16);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_SAMPLES__24", raymarchSamples == RaymarchSamples._24);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_SAMPLES__32", raymarchSamples == RaymarchSamples._32);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_SAMPLES__48", raymarchSamples == RaymarchSamples._48);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_SAMPLES__64", raymarchSamples == RaymarchSamples._64);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_SAMPLES__128", raymarchSamples == RaymarchSamples._128);
+                VolumeGeneratorUtility.SetMaterialKeyword(fogMaterial, "_USE_DENSITY_TEXTURE", seperateDensityTexture);
+
+                fogMaterial.SetInt("_Samples", (int)raymarchSamples);
+                fogMaterial.SetInt("_UseDensityTexture", seperateDensityTexture ? 1 : 0);
                 fogMaterial.SetVector("_VolumePos", new Vector4(transform.position.x, transform.position.y, transform.position.z, 0.0f));
                 fogMaterial.SetVector("_VolumeSize", new Vector4(volumeSize.x, volumeSize.y, volumeSize.z, 0.0f));
-                UpdateMaterialKeywords();
-
-                fogMaterial.SetTexture("_VolumeTexture", GetVolumeTexture());
+                fogMaterial.SetTexture("_VolumeTexture", GetFinalVolume());
                 fogMaterial.SetTexture("_JitterTexture", NoiseLibrary.GetBlueNoise());
-
-                fogSceneObject.transform.localScale = Vector3.one * volumeSize.magnitude * 1.5f;
+                fogMaterial.SetTexture("_DensityVolumeTexture", seperateDensityTexture ? GetDensityVolume() : null);
             }
-        }
 
-        public void UpdateMaterialKeywords()
-        {
-            Material material = lightingSource == LightingSource.LightProbeProxyVolume ? fogMaterialLPPV : fogMaterial;
-
-            if (material == null)
-                return;
-
-            switch (raymarchSamples)
-            {
-                case RaymarchSamples._8:
-                    material.EnableKeyword("SAMPLES_8");
-                    material.DisableKeyword("SAMPLES_16");
-                    material.DisableKeyword("SAMPLES_24");
-                    material.DisableKeyword("SAMPLES_32");
-                    material.DisableKeyword("SAMPLES_48");
-                    material.DisableKeyword("SAMPLES_64");
-                    material.DisableKeyword("SAMPLES_128");
-                    break;
-                case RaymarchSamples._16:
-                    material.DisableKeyword("SAMPLES_8");
-                    material.EnableKeyword("SAMPLES_16");
-                    material.DisableKeyword("SAMPLES_24");
-                    material.DisableKeyword("SAMPLES_32");
-                    material.DisableKeyword("SAMPLES_48");
-                    material.DisableKeyword("SAMPLES_64");
-                    material.DisableKeyword("SAMPLES_128");
-                    break;
-                case RaymarchSamples._24:
-                    material.DisableKeyword("SAMPLES_8");
-                    material.DisableKeyword("SAMPLES_16");
-                    material.EnableKeyword("SAMPLES_24");
-                    material.DisableKeyword("SAMPLES_32");
-                    material.DisableKeyword("SAMPLES_48");
-                    material.DisableKeyword("SAMPLES_64");
-                    material.DisableKeyword("SAMPLES_128");
-                    break;
-                case RaymarchSamples._32:
-                    material.DisableKeyword("SAMPLES_8");
-                    material.DisableKeyword("SAMPLES_16");
-                    material.DisableKeyword("SAMPLES_24");
-                    material.EnableKeyword("SAMPLES_32");
-                    material.DisableKeyword("SAMPLES_48");
-                    material.DisableKeyword("SAMPLES_64");
-                    material.DisableKeyword("SAMPLES_128");
-                    break;
-                case RaymarchSamples._48:
-                    material.DisableKeyword("SAMPLES_8");
-                    material.DisableKeyword("SAMPLES_16");
-                    material.DisableKeyword("SAMPLES_24");
-                    material.DisableKeyword("SAMPLES_32");
-                    material.EnableKeyword("SAMPLES_48");
-                    material.DisableKeyword("SAMPLES_64");
-                    material.DisableKeyword("SAMPLES_128");
-                    break;
-                case RaymarchSamples._64:
-                    material.DisableKeyword("SAMPLES_8");
-                    material.DisableKeyword("SAMPLES_16");
-                    material.DisableKeyword("SAMPLES_24");
-                    material.DisableKeyword("SAMPLES_32");
-                    material.DisableKeyword("SAMPLES_48");
-                    material.EnableKeyword("SAMPLES_64");
-                    material.DisableKeyword("SAMPLES_128");
-                    break;
-                case RaymarchSamples._128:
-                    material.DisableKeyword("SAMPLES_8");
-                    material.DisableKeyword("SAMPLES_16");
-                    material.DisableKeyword("SAMPLES_24");
-                    material.DisableKeyword("SAMPLES_32");
-                    material.DisableKeyword("SAMPLES_48");
-                    material.DisableKeyword("SAMPLES_64");
-                    material.EnableKeyword("SAMPLES_128");
-                    break;
-            }
+            fogSceneObject.transform.localScale = Vector3.one * volumeSize.magnitude * 1.5f;
         }
 
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| UTILITIES ||||||||||||||||||||||||||||||||||||||||||||||||||||||||
@@ -377,80 +353,6 @@ namespace BakedVolumetrics
                 volumeResolution = customVolumeResolution;
             else if (voxelCalculation == VoxelCalculation.Automatic)
                 volumeResolution = new Vector3Int((int)(volumeSize.x / voxelDensitySize), (int)(volumeSize.y / voxelDensitySize), (int)(volumeSize.z / voxelDensitySize));
-        }
-
-        public TextureFormat GetTextureFormat()
-        {
-            switch (volumeBitDepth)
-            {
-                case VolumeBitDepth.RGB8:
-                    return TextureFormat.RGB24;
-                case VolumeBitDepth.RGBA8:
-                    return TextureFormat.RGBA32;
-                case VolumeBitDepth.RGBA16:
-                    return TextureFormat.RGBAHalf;
-                case VolumeBitDepth.RGBA32:
-                    return TextureFormat.RGBAFloat;
-                default:
-                    return TextureFormat.RGBAHalf;
-            }
-        }
-
-        public RenderTextureFormat GetRenderTextureFormat()
-        {
-            switch (volumeBitDepth)
-            {
-                case VolumeBitDepth.RGB8:
-                    return RenderTextureFormat.ARGB32;
-                case VolumeBitDepth.RGBA8:
-                    return RenderTextureFormat.ARGB32;
-                case VolumeBitDepth.RGBA16:
-                    return RenderTextureFormat.ARGBHalf;
-                case VolumeBitDepth.RGBA32:
-                    return RenderTextureFormat.ARGBFloat;
-                default:
-                    return RenderTextureFormat.ARGBHalf;
-            }
-        }
-
-        public void GenerateLPPV()
-        {
-            lightProbeProxyVolume = transform.GetComponentInChildren<LightProbeProxyVolume>();
-
-            if (lightProbeProxyVolume == null)
-            {
-                GameObject newGameObject = new GameObject("Light Probe Proxy Volume");
-
-                newGameObject.transform.SetParent(transform);
-                newGameObject.transform.localPosition = Vector3.zero;
-
-                lightProbeProxyVolume = newGameObject.AddComponent<LightProbeProxyVolume>();
-            }
-
-            //if there is no scene object, try finding one
-            if (fogSceneObject == null)
-            {
-                if (transform.childCount > 0)
-                    fogSceneObject = transform.GetChild(0).gameObject;
-            }
-
-            if (fogMeshRenderer == null)
-            {
-                fogMeshRenderer = fogSceneObject.GetComponent<MeshRenderer>();
-            }
-
-            fogMaterialLPPV = GetVolume_LPPV_Material();
-
-            fogMeshRenderer.lightProbeProxyVolumeOverride = lightProbeProxyVolume.gameObject;
-            fogMeshRenderer.lightProbeUsage = LightProbeUsage.UseProxyVolume;
-            fogMeshRenderer.material = fogMaterialLPPV;
-
-            lightProbeProxyVolume.transform.localScale = volumeSize;
-            lightProbeProxyVolume.boundingBoxMode = LightProbeProxyVolume.BoundingBoxMode.AutomaticLocal;
-            lightProbeProxyVolume.probePositionMode = LightProbeProxyVolume.ProbePositionMode.CellCorner;
-            lightProbeProxyVolume.refreshMode = LightProbeProxyVolume.RefreshMode.EveryFrame;
-            lightProbeProxyVolume.qualityMode = LightProbeProxyVolume.QualityMode.Normal;
-            lightProbeProxyVolume.dataFormat = LightProbeProxyVolume.DataFormat.Float;
         }
 
         public void GenerateLightProbeGroup()
@@ -506,6 +408,155 @@ namespace BakedVolumetrics
             LightProbeGroup[] existingGroups = FindObjectsOfType<LightProbeGroup>();
 
             return existingGroups == null || existingGroups.Length < 1;
+        }
+
+        public void ApplyAdjustments(Texture3D volumeRead)
+        {
+            volumeGeneratorAssets.GetResources();
+
+            //double timeBeforeBake = Time.realtimeSinceStartupAsDouble;
+            double timeBeforeBake = Time.realtimeSinceStartup;
+
+            VolumeGeneratorUtility.UpdateProgressBar("Preparing to generate Light Probe volume...", 0.5f);
+
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER SETUP ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER SETUP ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER SETUP ||||||||||||||||||||||||||||||||||||||||||
+
+            //consruct our render texture that we will write into
+            RenderTexture volumeWrite = new RenderTexture(volumeResolution.x, volumeResolution.y, 0, GetRenderTextureFormat());
+            volumeWrite.dimension = TextureDimension.Tex3D;
+            volumeWrite.filterMode = FilterMode.Bilinear;
+            volumeWrite.wrapMode = TextureWrapMode.Clamp;
+            volumeWrite.volumeDepth = volumeResolution.z;
+            volumeWrite.enableRandomWrite = true;
+            volumeWrite.Create();
+
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING POST ADJUSTMENTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING POST ADJUSTMENTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING POST ADJUSTMENTS ||||||||||||||||||||||||||||||||||||||||||
+
+            VolumeGeneratorUtility.UpdateProgressBar("Applying Post Adjustments...", 0.5f);
+
+            //fetch our main adjustments function kernel in the compute shader
+            int ComputeShader_Adjustments = volumeGeneratorAssets.adjustments.FindKernel("Adjustments");
+
+            //make sure the compute shader knows the following parameters.
+            volumeGeneratorAssets.adjustments.SetFloat("Brightness", brightness);
+            volumeGeneratorAssets.adjustments.SetFloat("Contrast", contrast);
+            volumeGeneratorAssets.adjustments.SetFloat("Saturation", saturation);
+            volumeGeneratorAssets.adjustments.SetFloat("Vibrance", vibrance);
+            volumeGeneratorAssets.adjustments.SetFloat("HueShift", hueShift);
+            volumeGeneratorAssets.adjustments.SetFloat("Gamma", gamma);
+            volumeGeneratorAssets.adjustments.SetFloat("ColorFilterStrength", colorFilterAmount);
+            volumeGeneratorAssets.adjustments.SetVector("ColorFilter", colorFilter);
+            volumeGeneratorAssets.adjustments.SetVector("ColorMultiply", colorMultiply);
+            volumeGeneratorAssets.adjustments.SetVector("VolumeResolution", new Vector4(volumeResolution.x, volumeResolution.y, volumeResolution.z, 0));
+
+            //feed our compute shader the appropriate textures.
+            volumeGeneratorAssets.adjustments.SetTexture(ComputeShader_Adjustments, "VolumetricBase", volumeRead);
+            volumeGeneratorAssets.adjustments.SetTexture(ComputeShader_Adjustments, "VolumetricWrite", volumeWrite);
+
+            //let the GPU perform color adjustments to the 3D volume.
+            volumeGeneratorAssets.adjustments.GetKernelThreadGroupSizes(ComputeShader_Adjustments, out THREAD_GROUP_SIZE_X, out THREAD_GROUP_SIZE_Y, out THREAD_GROUP_SIZE_Z);
+            volumeGeneratorAssets.adjustments.Dispatch(ComputeShader_Adjustments, Mathf.CeilToInt(volumeResolution.x / THREAD_GROUP_SIZE_X), Mathf.CeilToInt(volumeResolution.y / THREAD_GROUP_SIZE_Y), Mathf.CeilToInt(volumeResolution.z / THREAD_GROUP_SIZE_Z));
+
+            //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
+
+            VolumeGeneratorUtility.UpdateProgressBar("Saving to disk...", 0.5f);
+
+            //save it!
+            renderTextureConverter.SaveRenderTexture3DAsTexture3D(volumeWrite, finalVolumeAssetPath);
+
+            //we are done with this, so clean up.
+            volumeWrite.Release();
+
+            //double timeAfterBake = Time.realtimeSinceStartupAsDouble - timeBeforeBake;
+            double timeAfterBake = Time.realtimeSinceStartup - timeBeforeBake;
+            Debug.Log(string.Format("'{0}' took {1} seconds to bake.", volumeName, timeAfterBake));
+
+            VolumeGeneratorUtility.CloseProgressBar();
+        }
+
+        public void ApplyDensity(Texture3D volumeRead, bool generateSeperateTexture)
+        {
+            volumeGeneratorAssets.GetResources();
+
+            //double timeBeforeBake = Time.realtimeSinceStartupAsDouble;
+            double timeBeforeBake = Time.realtimeSinceStartup;
+
+            VolumeGeneratorUtility.UpdateProgressBar("Preparing to generate Light Probe volume...", 0.5f);
+
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER SETUP ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER SETUP ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| COMPUTE SHADER SETUP ||||||||||||||||||||||||||||||||||||||||||
+
+            //consruct our render texture that we will write into
+            RenderTexture volumeWrite = new RenderTexture(volumeResolution.x, volumeResolution.y, 0, seperateDensityTexture ? RenderTextureFormat.R8 : GetRenderTextureFormat());
+            volumeWrite.filterMode = FilterMode.Bilinear;
+            volumeWrite.wrapMode = TextureWrapMode.Clamp;
+            volumeWrite.dimension = TextureDimension.Tex3D;
+            volumeWrite.volumeDepth = volumeResolution.z;
+            volumeWrite.enableRandomWrite = true;
+            volumeWrite.Create();
+
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING DENSITY ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING DENSITY ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| APPLYING DENSITY ||||||||||||||||||||||||||||||||||||||||||
+
+            VolumeGeneratorUtility.UpdateProgressBar("Applying Density...", 0.5f);
+
+            //fetch our main adjustments function kernel in the compute shader
+            int ComputeShader_ApplyVolumeDensity = volumeGeneratorAssets.density.FindKernel("ComputeShader_ApplyVolumeDensity");
+
+            volumeGeneratorAssets.density.SetVector("VolumeResolution", new Vector4(volumeResolution.x, volumeResolution.y, volumeResolution.z, 0));
+            volumeGeneratorAssets.density.SetVector("VolumePosition", transform.position);
+            volumeGeneratorAssets.density.SetVector("VolumeSize", volumeSize);
+
+            //make sure the compute shader knows the following parameters.
+            volumeGeneratorAssets.density.SetFloat("DensityConstant", densityConstant);
+            volumeGeneratorAssets.density.SetFloat("DensityTop", densityTop);
+            volumeGeneratorAssets.density.SetFloat("DensityBottom", densityBottom);
+            volumeGeneratorAssets.density.SetFloat("DensityHeight", densityHeight);
+            volumeGeneratorAssets.density.SetFloat("DensityHeightFallof", densityHeightFallof);
+            volumeGeneratorAssets.density.SetFloat("DensityLuminanceMultiplier", densityLuminanceMultiplier);
+            volumeGeneratorAssets.density.SetBool("DensityInvertLuminance", densityInvertLuminance);
+            //volumeGeneratorAssets.density.SetVector("unity_ColorSpaceLuminance", Shader.GetGlobalVector("unity_ColorSpaceLuminance"));
+            volumeGeneratorAssets.density.SetVector("unity_ColorSpaceLuminance", new Vector4(0.2125f, 0.7154f, 0.0721f, 0.0f));
+
+            VolumeGeneratorUtility.SetComputeKeyword(volumeGeneratorAssets.density, "SEPERATE_DENSITY_TEXTURE", generateSeperateTexture);
+            VolumeGeneratorUtility.SetComputeKeyword(volumeGeneratorAssets.density, "DENSITY_CONSTANT", densityType == DensityType.Constant);
+            VolumeGeneratorUtility.SetComputeKeyword(volumeGeneratorAssets.density, "DENSITY_LUMINANCE", densityType == DensityType.Luminance);
+            VolumeGeneratorUtility.SetComputeKeyword(volumeGeneratorAssets.density, "DENSITY_HEIGHTBASED", densityType == DensityType.HeightBased);
+            VolumeGeneratorUtility.SetComputeKeyword(volumeGeneratorAssets.density, "DENSITY_HEIGHTBASEDLUMINANCE", densityType == DensityType.HeightBasedLuminance);
+
+            //feed our compute shader the appropriate textures.
+            volumeGeneratorAssets.density.SetTexture(ComputeShader_ApplyVolumeDensity, "Read", volumeRead);
+            volumeGeneratorAssets.density.SetTexture(ComputeShader_ApplyVolumeDensity, "Write", volumeWrite);
+
+            //let the GPU perform color adjustments to the 3D volume.
+            volumeGeneratorAssets.density.GetKernelThreadGroupSizes(ComputeShader_ApplyVolumeDensity, out THREAD_GROUP_SIZE_X, out THREAD_GROUP_SIZE_Y, out THREAD_GROUP_SIZE_Z);
+            volumeGeneratorAssets.density.Dispatch(ComputeShader_ApplyVolumeDensity, Mathf.CeilToInt(volumeResolution.x / THREAD_GROUP_SIZE_X), Mathf.CeilToInt(volumeResolution.y / THREAD_GROUP_SIZE_Y), Mathf.CeilToInt(volumeResolution.z / THREAD_GROUP_SIZE_Z));
+
+            //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
+            //|||||||||||||||||||||||||||||||||||||||||| SAVING RESULTS ||||||||||||||||||||||||||||||||||||||||||
+
+            VolumeGeneratorUtility.UpdateProgressBar("Saving to disk...", 0.5f);
+
+            //save it!
+            renderTextureConverter.SaveRenderTexture3DAsTexture3D(volumeWrite, generateSeperateTexture ? finalVolumeDensityAssetPath : finalVolumeAssetPath);
+
+            //we are done with this, so clean up.
+            volumeWrite.Release();
+
+            //double timeAfterBake = Time.realtimeSinceStartupAsDouble - timeBeforeBake;
+            double timeAfterBake = Time.realtimeSinceStartup - timeBeforeBake;
+            Debug.Log(string.Format("'{0}' took {1} seconds to bake.", volumeName, timeAfterBake));
+
+            VolumeGeneratorUtility.CloseProgressBar();
         }
 
         //|||||||||||||||||||||||||||||||||||||||||||||||||||||||| GIZMOS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||

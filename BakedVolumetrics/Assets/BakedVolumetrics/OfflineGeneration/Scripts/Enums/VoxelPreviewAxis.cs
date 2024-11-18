@@ -1,5 +1,5 @@
 #if UNITY_EDITOR
-namespace BakedVolumetrics
+namespace BakedVolumetricsOffline
 {
     public enum VoxelPreviewAxis
     {

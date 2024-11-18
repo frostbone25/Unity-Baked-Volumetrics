@@ -9,8 +9,8 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: SceneVolume
   m_Shader: {fileID: 4800000, guid: 4c531454e78090b41bad275f01555477, type: 3}
-  m_ShaderKeywords: ANIMATED_NOISE SAMPLES_16 _SAMPLES__16 _SKIPPIXELS_ONE _SKIPPIXELS_ONE_PIXEL
-    ___8
+  m_ShaderKeywords: SAMPLES_128 _HDRENCODING_NONE _KILL_RAYS_EXITING_VOLUME _RAYS_ONLY_IN_VOLUME
+    _SAMPLES__8
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -20,27 +20,40 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _DensityVolumeTexture:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _JitterTexture:
         m_Texture: {fileID: 2800000, guid: ddf055324c97ca24b924b70118f98a00, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _SceneAlbedo:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _VolumeTexture:
-        m_Texture: {fileID: 11700000, guid: c4aad6124e7029f4d898e00a9b8927cc, type: 2}
+        m_Texture: {fileID: 11700000, guid: 65a3dce49b3de804ebe324b8ec80c2a0, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
-    - RAYMARCH_STEPSize: 25
-    - _: 0
-    - _Color: 0
+    - _CullMode: 1
     - _EnableAnimatedJitter: 0
+    - _HDREncoding: 0
     - _HalfResolution: 0
-    - _MipQuadOptimization: 0
-    - _RaymarchJitterStrength: 1
-    - _RaymarchStepSize: 54.3
-    - _Samples: 1
-    - _SkipPixels: 1
-    - _VolumeDensity: 1
+    - _JitterStrength: 2
+    - _RaymarchJitterStrength: 2
+    - _RaymarchStepSize: 33.58
+    - _RaysOnlyInVolume: 0
+    - _Samples: 0
+    - _StopRaysExitingVolume: 1
+    - _TerminateRaysOutsideVolume: 0
+    - _Test: -52.9
+    - _UseDensityTexture: 0
     m_Colors:
+    - _LightColor: {r: 1, g: 1, b: 1, a: 0}
+    - _LightPos: {r: 0, g: 0, b: 0, a: 0}
     - _VolumePos: {r: -5, g: 14.5, b: 1, a: 0}
+    - _VolumeResolution: {r: 0, g: 0, b: 0, a: 0}
     - _VolumeSize: {r: 94, g: 31, b: 64, a: 0}
   m_BuildTextureStacks: []

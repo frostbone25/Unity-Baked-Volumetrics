@@ -1,0 +1,137 @@
+//#define THREAD_GROUP_SIZE_X 8
+//#define THREAD_GROUP_SIZE_Y 8
+//#define THREAD_GROUP_SIZE_Z 8
+//512 threads
+
+#define THREAD_GROUP_SIZE_X 4
+#define THREAD_GROUP_SIZE_Y 4
+#define THREAD_GROUP_SIZE_Z 4
+//64 threads
+
+//https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityCG.cginc
+//From UnityCG.cginc
+#define UNITY_PI            3.14159265359f
+#define UNITY_TWO_PI        6.28318530718f
+
+//This acts like a bias for the surface tracing functions, 1 gives best results.
+//Though this can cause issues with thin geometry (i.e. things that are only represented as a single voxel and no neighboring ones)
+//TODO: With voxelization, introduce an adjustable thickness modifier when generating them for the scene.
+#define SURFACE_ENVIRONMENT_OCCLUSION_SKIP_ITERATION 0
+
+//[FIX]: (Thanks Pema!) This is a solution to solve the problem with causing TDR/driver timeouts.
+//We force the occlusion checking loop to terminate at some point even if it manages to run forever somehow.
+#define MAX_LOOP_ITERATIONS 2048
+
+#include "ComputeTextureSampling.cginc"
+#include "Random.cginc"
+#include "Sampling.cginc"
+#include "VoxelTracerUtilities.cginc"
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+//#pragma multi_compile_local _ NORMAL_ORIENTED_HEMISPHERE_SAMPLING
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+TextureCube<float4> EnvironmentMap;
+
+Texture3D<float4> SceneAlbedo;
+//Texture3D<float4> SceneNormal;
+
+RWTexture3D<float4> Write;
+
+float3 VolumePosition;
+float3 VolumeSize;
+float3 VolumeResolution;
+
+int MaxEnvironmentSamples;
+
+float EnvironmentIntensity;
+
+RWStructuredBuffer<int> DummyComputeBuffer;
+
+//||||||||||||||||||||||||||||| ComputeShader_TraceVolumetricEnvironmentLight |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_TraceVolumetricEnvironmentLight |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_TraceVolumetricEnvironmentLight |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_TraceVolumetricEnvironmentLight
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_TraceVolumetricEnvironmentLight(uint3 id : SV_DispatchThreadID)
+{
+    float3 voxelPosition = id.xyz + float3(0.5, 0.5, 0.5);
+    voxelPosition /= VolumeResolution.xyz;
+
+    float3 singleVoxelSize = VolumeSize / VolumeResolution;
+    float3 volumeHalfSize = VolumeSize * 0.5f;
+    float3 worldVoxelPosition = VolumePosition + (voxelPosition * VolumeSize) - volumeHalfSize;
+
+    //float4 sceneAlbedo = TEX3D_SHARP(SceneAlbedo, voxelPosition);
+    float4 sceneAlbedo = SceneAlbedo[id.xyz];
+
+    //[OPTIMIZATION]
+    //Since we are tracing "volumetric light", we don't care about opaque voxels, only transparent ones matter.
+    //So if the current voxel is opaque, then we stop here.
+    if (sceneAlbedo.a > 0.0) 
+    {
+        Write[id.xyz] = float4(0, 0, 0, 1);
+        return;
+    }
+
+    //float4 sceneNormal = TEX3D_SHARP(SceneNormal, voxelPosition);
+    //float4 sceneNormal = SceneNormal[id.xyz];
+    //sceneNormal = sceneNormal * 2.0f - 1.0f;
+
+    //trace lights
+    float4 finalColor = float4(0, 0, 0, 0);
+
+    float2 noise = float2(GenerateRandomFloat(voxelPosition.xyz * VolumeResolution), GenerateRandomFloat(voxelPosition.xyz * VolumeResolution));
+
+    float3 vector_environmentRayPosition = worldVoxelPosition;
+
+    #if defined (NORMAL_ORIENTED_HEMISPHERE_SAMPLING)
+        float3 vector_environmentRayDirection = SampleHemisphereCosine(noise.x, noise.y, sceneNormal);
+    #else
+        float3 vector_environmentRayDirection = SampleSphereUniform(noise.x, noise.y);
+    #endif
+
+    int iterationIndex = 0;
+
+    //NOTE: This is the most expensive operation, marching our ray until we hit an opaque voxel.
+    while(iterationIndex < MAX_LOOP_ITERATIONS)
+    {
+        //if (PositionInVolumeBounds(vector_environmentRayPosition.xyz, VolumePosition, VolumeSize) == false)
+            //break;
+
+        //keep stepping the ray in world space
+        vector_environmentRayPosition += vector_environmentRayDirection * singleVoxelSize;
+
+        if (iterationIndex >= SURFACE_ENVIRONMENT_OCCLUSION_SKIP_ITERATION)
+        {
+            float3 environmentLight_scaledRayPosition = ((vector_environmentRayPosition + volumeHalfSize) - VolumePosition) / VolumeSize;
+            float4 occlusionSample = TEX3D_SHARP(SceneAlbedo, environmentLight_scaledRayPosition, 0);
+
+            if (occlusionSample.a > 0.0)
+                break;
+            
+            if (PositionInVolumeBounds(vector_environmentRayPosition.xyz, VolumePosition, VolumeSize) == false)
+            {
+                float3 environmentLightSample = TEXCUBE_SHARP(EnvironmentMap, vector_environmentRayDirection, 0).rgb * EnvironmentIntensity;
+
+                finalColor.rgb += environmentLightSample;
+
+                break;
+            }
+        }
+
+        iterationIndex++;
+    }
+
+    finalColor = max(0.0f, finalColor);
+
+    //Write[id.xyz] += finalColor * (1.0f / MaxEnvironmentSamples);
+    Write[id.xyz] = float4(Write[id.xyz].rgb + finalColor.rgb * (1.0f / MaxEnvironmentSamples), 1);
+}

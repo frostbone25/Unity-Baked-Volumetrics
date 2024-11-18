@@ -1,0 +1,81 @@
+﻿//#define THREAD_GROUP_SIZE_X 8
+//#define THREAD_GROUP_SIZE_Y 8
+//#define THREAD_GROUP_SIZE_Z 8
+//512 threads
+
+#define THREAD_GROUP_SIZE_X 4
+#define THREAD_GROUP_SIZE_Y 4
+#define THREAD_GROUP_SIZE_Z 4
+//64 threads
+
+//https://github.com/TwoTailsGames/Unity-Built-in-Shaders/blob/master/CGIncludes/UnityCG.cginc
+//From UnityCG.cginc
+#define UNITY_PI            3.14159265359f
+#define UNITY_TWO_PI        6.28318530718f
+
+#define pow2(x) (x * x)
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+int BlurSamples;
+float3 BlurDirection;
+float3 VolumeResolution;
+
+RWTexture3D<float4> Write;
+
+Texture3D<float4> Read;
+
+SamplerState _PointClamp;
+SamplerState _LinearClamp;
+
+float CalculateGaussianWeight(float2 i) 
+{
+    float sigma = float(BlurSamples) * 0.25;
+
+    return 1.0 / (2.0 * UNITY_PI * pow2(sigma)) * exp(-((pow2(i.x) + pow2(i.y)) / (2.0 * pow2(sigma))));
+}
+
+float4 GaussianBlur(float3 uv)
+{
+    float3 scale = float3(1, 1, 1) / VolumeResolution.xyz;
+    float4 offset = float4(0, 0, 0, 0);
+    float4 col = float4(0, 0, 0, 0);
+    float accum = 0.0;
+    float weight = 0.0;
+
+    for (int i = -(BlurSamples / 2); i <= BlurSamples / 2; ++i)
+    {
+        if (BlurDirection.x > 0)
+            offset = float4(i, 0, 0, 0);
+        else if (BlurDirection.y > 0)
+            offset = float4(0, i, 0, 0);
+        else if (BlurDirection.z > 0)
+            offset = float4(0, 0, i, 0);
+
+        weight = CalculateGaussianWeight(offset);
+
+        col += Read.SampleLevel(_LinearClamp, uv + scale * offset, 0) * weight;
+
+        accum += weight;
+    }
+
+    return col / accum;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_GaussianBlur |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_GaussianBlur |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_GaussianBlur |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_GaussianBlur
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_GaussianBlur(uint3 id : SV_DispatchThreadID)
+{
+    float3 position = id.xyz + float3(0.5, 0.5, 0.5);
+    position.xyz /= VolumeResolution.xyz;
+
+    float4 color = GaussianBlur(position);
+
+    Write[id.xyz] = float4(color.rgb, 1);
+}

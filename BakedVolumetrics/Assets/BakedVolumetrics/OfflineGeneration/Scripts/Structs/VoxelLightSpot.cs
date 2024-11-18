@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-namespace BakedVolumetrics
+namespace BakedVolumetricsOffline
 {
     /// <summary>
     /// Spot Light (384 BITS | 48 BYTES)

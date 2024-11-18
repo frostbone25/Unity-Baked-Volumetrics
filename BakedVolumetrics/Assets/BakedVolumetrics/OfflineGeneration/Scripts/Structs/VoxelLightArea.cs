@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-namespace BakedVolumetrics
+namespace BakedVolumetricsOffline
 {
     /// <summary>
     /// Area Light (640 BITS | 80 BYTES)

@@ -1,0 +1,66 @@
+﻿#define THREAD_GROUP_SIZE_X 4
+#define THREAD_GROUP_SIZE_Y 4
+#define THREAD_GROUP_SIZE_Z 4
+//64 threads
+
+
+#include "EncodingDecodingHDR.cginc"
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+#pragma multi_compile_local _ EMISSION_HDR_RGBM
+#pragma multi_compile_local _ EMISSION_HDR_RGBD
+#pragma multi_compile_local _ EMISSION_HDR_RGBE
+#pragma multi_compile_local _ EMISSION_HDR_LOG_LUV_32
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+RWTexture3D<float4> RawBuffer;
+RWTexture3D<float4> PackedBuffer;
+RWTexture3D<float4> Write;
+
+//||||||||||||||||||||||||||||| ComputeShader_HDRPacking32 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_HDRPacking32 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_HDRPacking32 |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_HDRPacking32
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_HDRPacking32(uint3 id : SV_DispatchThreadID)
+{
+#if defined (EMISSION_HDR_RGBM)
+    Write[id.xyz] = EncodeRGBM(RawBuffer[id.xyz].rgb);
+#elif defined (EMISSION_HDR_RGBD)
+    Write[id.xyz] = EncodeRGBD(RawBuffer[id.xyz].rgb);
+#elif defined (EMISSION_HDR_RGBE)
+    Write[id.xyz] = EncodeRGBE(RawBuffer[id.xyz].rgb);
+#elif defined (EMISSION_HDR_LOG_LUV_32)
+    Write[id.xyz] = EncodeLogLuv32(RawBuffer[id.xyz].rgb);
+#else
+    Write[id.xyz] = float4(0, 0, 0, 0);
+#endif
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_HDRUnpacking32 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_HDRUnpacking32 |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_HDRUnpacking32 |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_HDRUnpacking32
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_HDRUnpacking32(uint3 id : SV_DispatchThreadID)
+{
+#if defined (EMISSION_HDR_RGBM)
+    Write[id.xyz] = float4(DecodeRGBM(PackedBuffer[id.xyz]), 1);
+#elif defined (EMISSION_HDR_RGBD)
+    Write[id.xyz] = float4(DecodeRGBD(PackedBuffer[id.xyz]), 1);
+#elif defined (EMISSION_HDR_RGBE)
+    Write[id.xyz] = float4(DecodeRGBE(PackedBuffer[id.xyz]), 1);
+#elif defined (EMISSION_HDR_LOG_LUV_32)
+    Write[id.xyz] = float4(DecodeLogLuv32(PackedBuffer[id.xyz]), 1);
+#else
+    Write[id.xyz] = float4(0, 0, 0, 0);
+#endif
+}

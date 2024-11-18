@@ -1,0 +1,230 @@
+#define THREAD_GROUP_SIZE_X 8
+#define THREAD_GROUP_SIZE_Y 8
+#define THREAD_GROUP_SIZE_Z 8
+
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| KEYWORDS ||||||||||||||||||||||||||||||||||||||
+
+#pragma multi_compile_local _ BLEND_SLICES
+#pragma multi_compile_local _ LINEAR_TO_GAMMA
+#pragma multi_compile_local _ GAMMA_TO_LINEAR
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+RWTexture2D<float4> CameraVoxelRender;
+RWTexture3D<float4> Write;
+
+float3 VolumeResolution;
+
+int AxisIndex;
+
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_X_POS |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_X_POS |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_X_POS |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_VoxelizeScene_X_POS
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_VoxelizeScene_X_POS(uint2 id : SV_DispatchThreadID)
+{
+    //voxelCameraSlice = new RenderTexture(voxelResolution.z, voxelResolution.y, rtDepth, rtFormat);
+    uint3 WriteIndex = uint3(AxisIndex, id.y, VolumeResolution.z - id.x);
+
+    if (!(CameraVoxelRender[id.xy].a > 0.0f))
+        return;
+
+#if defined(LINEAR_TO_GAMMA)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 1.0f / 2.2f);
+#endif
+    
+#if defined(GAMMA_TO_LINEAR)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 2.2f);
+#endif
+    
+    Write[WriteIndex] = CameraVoxelRender[id.xy];
+
+    return;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_X_NEG |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_X_NEG |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_X_NEG |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_VoxelizeScene_X_NEG
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_VoxelizeScene_X_NEG(uint2 id : SV_DispatchThreadID)
+{
+    //voxelCameraSlice = new RenderTexture(voxelResolution.z, voxelResolution.y, rtDepth, rtFormat);
+    uint3 WriteIndex = uint3(VolumeResolution.x - AxisIndex, id.y, id.x);
+
+    if (!(CameraVoxelRender[id.xy].a > 0.0f))
+        return;
+
+    WriteIndex += uint3(-1, 0, 0);
+
+#if defined(LINEAR_TO_GAMMA)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 1.0f / 2.2f);
+#endif
+    
+#if defined(GAMMA_TO_LINEAR)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 2.2f);
+#endif
+    
+#if defined(BLEND_SLICES)
+    if (Write[WriteIndex].a > 0.0f)
+        Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[id.xy]) * 0.5;
+    else
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#else
+    if (!(Write[WriteIndex].a > 0.0f))
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#endif
+
+    return;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Y_POS |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Y_POS |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Y_POS |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_VoxelizeScene_Y_POS
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_VoxelizeScene_Y_POS(uint2 id : SV_DispatchThreadID)
+{
+    //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.z, rtDepth, rtFormat);
+    uint3 WriteIndex = uint3(id.x, AxisIndex, VolumeResolution.z - id.y);
+
+    if (!(CameraVoxelRender[id.xy].a > 0.0f))
+        return;
+
+#if defined(LINEAR_TO_GAMMA)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 1.0f / 2.2f);
+#endif
+    
+#if defined(GAMMA_TO_LINEAR)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 2.2f);
+#endif
+    
+#if defined(BLEND_SLICES)
+    if (Write[WriteIndex].a > 0.0f)
+        Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[id.xy]) * 0.5;
+    else
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#else
+    if (!(Write[WriteIndex].a > 0.0f))
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#endif
+
+    return;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Y_NEG |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Y_NEG |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Y_NEG |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_VoxelizeScene_Y_NEG
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_VoxelizeScene_Y_NEG(uint2 id : SV_DispatchThreadID)
+{
+    //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.z, rtDepth, rtFormat);
+    uint3 WriteIndex = uint3(id.x, VolumeResolution.y - AxisIndex, id.y);
+
+    if (!(CameraVoxelRender[id.xy].a > 0.0f))
+        return;
+
+    WriteIndex += uint3(0, -1, 0);
+
+#if defined(LINEAR_TO_GAMMA)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 1.0f / 2.2f);
+#endif
+    
+#if defined(GAMMA_TO_LINEAR)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 2.2f);
+#endif
+    
+#if defined(BLEND_SLICES)
+    if (Write[WriteIndex].a > 0.0f)
+        Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[id.xy]) * 0.5;
+    else
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#else
+    if (!(Write[WriteIndex].a > 0.0f))
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#endif
+
+    return;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Z_POS |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Z_POS |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Z_POS |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_VoxelizeScene_Z_POS
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_VoxelizeScene_Z_POS(uint2 id : SV_DispatchThreadID)
+{
+    //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.y, rtDepth, rtFormat);
+    uint3 WriteIndex = uint3(id.x, id.y, AxisIndex);
+
+    if (!(CameraVoxelRender[id.xy].a > 0.0f))
+        return;
+
+#if defined(LINEAR_TO_GAMMA)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 1.0f / 2.2f);
+#endif
+    
+#if defined(GAMMA_TO_LINEAR)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 2.2f);
+#endif
+    
+#if defined(BLEND_SLICES)
+    if (Write[WriteIndex].a > 0.0f)
+        Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[id.xy]) * 0.5;
+    else
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#else
+    if (!(Write[WriteIndex].a > 0.0f))
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#endif
+
+    return;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Z_NEG |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Z_NEG |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_VoxelizeScene_Z_NEG |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_VoxelizeScene_Z_NEG
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, 1)]
+void ComputeShader_VoxelizeScene_Z_NEG(uint2 id : SV_DispatchThreadID)
+{
+    //voxelCameraSlice = new RenderTexture(voxelResolution.x, voxelResolution.y, rtDepth, rtFormat);
+    uint3 WriteIndex = uint3(VolumeResolution.x - id.x, id.y, VolumeResolution.z - AxisIndex);
+
+    if (!(CameraVoxelRender[id.xy].a > 0.0f))
+        return;
+
+    WriteIndex += uint3(0, 0, -1);
+
+#if defined(LINEAR_TO_GAMMA)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 1.0f / 2.2f);
+#endif
+    
+#if defined(GAMMA_TO_LINEAR)
+    CameraVoxelRender[id.xy] = pow(CameraVoxelRender[id.xy], 2.2f);
+#endif
+    
+#if defined(BLEND_SLICES)
+    if (Write[WriteIndex].a > 0.0f)
+        Write[WriteIndex] = (Write[WriteIndex] + CameraVoxelRender[id.xy]) * 0.5;
+    else
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#else
+    if (!(Write[WriteIndex].a > 0.0f))
+        Write[WriteIndex] = CameraVoxelRender[id.xy];
+#endif
+
+    return;
+}

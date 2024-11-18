@@ -1,0 +1,158 @@
+#define THREAD_GROUP_SIZE_X 8
+#define THREAD_GROUP_SIZE_Y 8
+#define THREAD_GROUP_SIZE_Z 8
+
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| VARIABLES ||||||||||||||||||||||||||||||||||||||
+
+RWTexture2D<float4> Write;
+
+int KernelSize;
+
+//|||||||||||||||||||||||||||||||||||||| FUNCTION ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| FUNCTION ||||||||||||||||||||||||||||||||||||||
+//|||||||||||||||||||||||||||||||||||||| FUNCTION ||||||||||||||||||||||||||||||||||||||
+
+float4 Dilate2D(uint2 uv)
+{
+    uint offset = 1;
+    int index = 0;
+
+    while (!(Write[uv].a > 0.0) && index < KernelSize)
+    {
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(0, offset)]; //up
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(0, -offset)]; //down
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(offset, 0)]; //right
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(-offset, 0)]; //left
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(-offset, -offset)]; //diagonal left down
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(-offset, offset)]; //diagonal left up
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(offset, offset)]; //diagonal right up
+        Write[uv] = Write[uv].a > 0.0 ? Write[uv] : Write[uv + uint2(offset, -offset)]; //diagonal right down
+
+        index++;
+    }
+
+    return Write[uv];
+}
+
+//https://shaderbits.com/blog/uv-dilation
+float4 Dilate2D_Basic(uint2 uv)
+{
+    float2 offsets[8] =
+    {
+        float2(-1, 0),
+        float2(1, 0),
+        float2(0, 1),
+        float2(0, -1),
+        float2(-1, 1),
+        float2(1, 1),
+        float2(1, -1),
+        float2(-1, -1)
+    };
+    
+    float4 sample = Write[uv];
+
+    if (sample.a != 0)
+    //if (sample.a != 0 || (sample.r != 0 && sample.g != 0 && sample.b != 0))
+    //if (sample.r != 0 && sample.g != 0 && sample.b != 0)
+    //if (sample.r != 0 || sample.g != 0 || sample.b != 0)
+        return sample;
+    
+    for (int i = 1; i <= KernelSize; i++)
+    {
+        for (int j = 0; j < 8; j++)
+        {
+            float2 curUV = uv + offsets[j] * i;
+            float4 offsetsample = Write[curUV];
+
+            if (offsetsample.a != 0)
+            //if (offsetsample.a != 0 || (offsetsample.r != 0 && offsetsample.g != 0 && offsetsample.b != 0))
+            //if (offsetsample.r != 0 && offsetsample.g != 0 && offsetsample.b != 0)
+            //if (offsetsample.r != 0 || offsetsample.g != 0 || offsetsample.b != 0)
+                return offsetsample;
+        }
+    }
+
+    return sample;
+}
+
+//https://shaderbits.com/blog/uv-dilation
+float4 Dilate2D_Improved(uint2 uv)
+{
+    //////////////// UV Positional Dilation ///////////////////////////
+    //** Tex **// Input Texture Object storing Volume Data
+    //** UV **// Input float2 for UVs
+    //** TextureSize **// Resolution of render target
+    //** MaxSteps **// Pixel Radius to search
+
+    float mindist = 10000000;
+    
+    float2 offsets[8] =
+    {
+        float2(-1, 0),
+        float2(1, 0),
+        float2(0, 1),
+        float2(0, -1),
+        float2(-1, 1),
+        float2(1, 1),
+        float2(1, -1),
+        float2(-1, -1)
+    };
+
+    float4 sample = Write[uv];
+    float4 curminsample = sample;
+
+    if (sample.a == 0)
+    {
+        for (int i = 1; i <= KernelSize; i++)
+        {
+            for (int j = 0; j < 8; j++)
+            {
+                float2 curUV = uv + offsets[j] * i;
+                float4 offsetsample = Write[curUV];
+
+                if (offsetsample.a != 0)
+                {
+                    float curdist = length(uv - curUV);
+
+                    if (curdist < mindist)
+                    {
+                        float2 projectUV = curUV + offsets[j] * i * 0.25;
+                        float4 direction = Write[projectUV];
+                        
+                        mindist = curdist;
+
+                        if (direction.a != 0)
+                        {
+                            float4 delta = offsetsample - direction;
+                            curminsample = offsetsample + delta * 4;
+
+                        }
+                        else
+                        {
+                            curminsample = offsetsample;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return curminsample;
+}
+
+//||||||||||||||||||||||||||||| ComputeShader_Dilation |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_Dilation |||||||||||||||||||||||||||||
+//||||||||||||||||||||||||||||| ComputeShader_Dilation |||||||||||||||||||||||||||||
+
+#pragma kernel ComputeShader_Dilation
+[numthreads(THREAD_GROUP_SIZE_X, THREAD_GROUP_SIZE_Y, THREAD_GROUP_SIZE_Z)]
+void ComputeShader_Dilation(uint3 id : SV_DispatchThreadID)
+{
+    float4 originalColor = Write[id.xy];
+    //Write[id.xy] = float4(Dilate2D(id.xy).rgb, originalColor.a);
+    //Write[id.xy] = float4(Dilate2D_Basic(id.xy).rgb, originalColor.a);
+    Write[id.xy] = Dilate2D_Basic(id.xy);
+    //Write[id.xy] = Dilate2D_Improved(id.xy);
+}
